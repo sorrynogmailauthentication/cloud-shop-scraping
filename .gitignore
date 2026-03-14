@@ -37,6 +37,8 @@ __pycache__/
 node_modules/
 # build output
 dist/
+# SQLite DB (backend)
+data/
 # environment variables
 .env
 .env.*

@@ -13,7 +13,17 @@ export const config = {
     userInfoUrl: 'https://login.yandex.ru/info',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'change-me-in-production',
+    secret: process.env.JWT_SECRET || '',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
+  db: {
+    host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
+    port: Number(process.env.PGPORT || process.env.DB_PORT) || 5432,
+    database: process.env.PGDATABASE || process.env.DB_NAME || 'priceMonitor',
+    user: process.env.PGUSER || process.env.DB_USER || '',
+    password: process.env.PGPASSWORD || process.env.DB_PASSWORD || '',
+  },
+  adminSecret: process.env.ADMIN_SECRET || '',
+  adminLogin: process.env.ADMIN_LOGIN || 'admin',
+  adminPassword: process.env.ADMIN_PASSWORD || '',
 } as const;

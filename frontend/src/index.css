@@ -140,6 +140,14 @@ a:hover {
   align-items: center;
   gap: 1rem;
 }
+.subscription-badge {
+  font-size: 0.8rem;
+  color: var(--accent);
+  padding: 0.25rem 0.5rem;
+  background: rgba(240, 180, 41, 0.12);
+  border-radius: 6px;
+  font-weight: 500;
+}
 .user-name {
   color: var(--muted);
   font-size: 0.9rem;
@@ -172,4 +180,134 @@ a:hover {
 .dashboard .muted {
   color: var(--muted);
   margin: 0 0 0.5rem;
+}
+.dashboard-waiting {
+  text-align: center;
+  padding-top: 2rem;
+}
+.dashboard-waiting h2 {
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+/* Admin */
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.input-field::placeholder {
+  color: var(--muted);
+}
+.btn-primary {
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #000;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.admin-panel {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.btn-home {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-home:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+.admin-login-home {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.admin-login-home a {
+  color: var(--muted);
+}
+.admin-login-home a:hover {
+  color: var(--accent);
+}
+.admin-content {
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 1.5rem;
+}
+.admin-content h2 {
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+}
+.admin-table-wrap {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-table th,
+.admin-table td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.admin-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.admin-table input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+.admin-date-input {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }

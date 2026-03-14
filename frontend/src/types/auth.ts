@@ -4,6 +4,8 @@ export interface User {
   displayName: string;
   email: string | null;
   avatarId: string | null;
+  isPaid: boolean;
+  accessUntil: string | null;
 }
 
 export interface AuthContextValue {

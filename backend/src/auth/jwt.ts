@@ -17,3 +17,22 @@ export function verifyToken(token: string): JwtPayload | null {
     return null;
   }
 }
+
+export interface AdminPayload {
+  admin: true;
+  iat?: number;
+  exp?: number;
+}
+
+export function signAdminToken(): string {
+  return jwt.sign({ admin: true } as AdminPayload, secret, { expiresIn });
+}
+
+export function verifyAdminToken(token: string): AdminPayload | null {
+  try {
+    const payload = jwt.verify(token, secret) as AdminPayload;
+    return payload?.admin === true ? payload : null;
+  } catch {
+    return null;
+  }
+}

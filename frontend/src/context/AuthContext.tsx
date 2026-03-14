@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_API_URL as string || '';
 const TOKEN_KEY = 'dashboard_token';
 
 function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const hashToken = params.get('token');
     if (hashToken) {
       const decoded = decodeURIComponent(hashToken);
-      localStorage.setItem(TOKEN_KEY, decoded);
+      sessionStorage.setItem(TOKEN_KEY, decoded);
       setTokenState(decoded);
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         setUser(null);
         setTokenState(null);
-        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
       }
     } catch (e) {
       setUser(null);
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setUser(null);
       setTokenState(null);
-      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
     }
   }, []);
 

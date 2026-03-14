@@ -8,6 +8,8 @@ export function getYandexAuthUrl(state = ''): string {
     response_type: 'code',
     client_id: y.clientId,
     redirect_uri: y.redirectUri,
+    scope: 'login:info login:email',
+    force_confirm: 'yes',
   });
   if (state) params.set('state', state);
   return `${y.authorizeUrl}?${params.toString()}`;

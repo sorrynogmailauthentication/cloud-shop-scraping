@@ -4,6 +4,8 @@ export interface JwtPayload {
   displayName: string;
   email: string | null;
   avatarId: string | null;
+  isPaid: boolean;
+  accessUntil: string | null;
   iat?: number;
   exp?: number;
 }

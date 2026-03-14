@@ -3,6 +3,7 @@ import { getYandexAuthUrl, exchangeCodeForToken, getYandexUser } from '../auth/y
 import { signToken, verifyToken } from '../auth/jwt.js';
 import { config } from '../config.js';
 import type { JwtPayload } from '../types/auth.js';
+import { upsertUser } from '../db/users.js';
 
 const router = Router();
 const { frontendUrl } = config;
@@ -29,12 +30,16 @@ router.get('/yandex/callback', async (req: Request, res) => {
     const { access_token } = await exchangeCodeForToken(code);
     const profile = await getYandexUser(access_token);
 
+    const dbUser = await upsertUser(profile);
+
     const payload: JwtPayload = {
       id: profile.id,
       login: profile.login,
       displayName: profile.display_name || profile.real_name || profile.login,
       email: profile.default_email ?? null,
       avatarId: profile.default_avatar_id ?? null,
+      isPaid: Boolean(dbUser.is_paid),
+      accessUntil: dbUser.access_until ?? null,
     };
 
     const token = signToken(payload);
@@ -64,7 +69,17 @@ router.get('/me', (req: Request, res) => {
     res.status(401).json({ error: 'Invalid or expired token' });
     return;
   }
-  res.json({ user: payload });
+  res.json({
+    user: {
+      id: payload.id,
+      email: payload.email,
+      login: payload.login,
+      displayName: payload.displayName,
+      avatarId: payload.avatarId,
+      isPaid: payload.isPaid,
+      accessUntil: payload.accessUntil,
+    },
+  });
 });
 
 export default router;

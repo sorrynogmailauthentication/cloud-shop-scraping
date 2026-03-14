@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
+  
   const { user, loading, loginWithYandex, error } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -15,9 +16,9 @@ export default function Login() {
   const err = queryError || error;
   const displayError = err ? (queryError ? decodeURIComponent(err) : err) : null;
 
-  if (loading && !err) return <div className="login-loading">Loading…</div>;
+  if (loading && !err) return <div className="login-loading">Loading...</div>;
 
-  return (
+ return (
     <div className="login-page">
       <div className="login-card">
         <h1>Cloud Shop Dashboard</h1>

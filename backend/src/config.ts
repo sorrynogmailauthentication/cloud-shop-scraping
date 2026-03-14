@@ -1,5 +1,8 @@
 import 'dotenv/config';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 export const config = {
   port: Number(process.env.PORT) || 4000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -19,7 +22,7 @@ export const config = {
   db: {
     host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
     port: Number(process.env.PGPORT || process.env.DB_PORT) || 5432,
-    database: process.env.PGDATABASE || process.env.DB_NAME || 'priceMonitor',
+    database: process.env.PGDATABASE || process.env.DB_NAME || '',
     user: process.env.PGUSER || process.env.DB_USER || '',
     password: process.env.PGPASSWORD || process.env.DB_PASSWORD || '',
   },

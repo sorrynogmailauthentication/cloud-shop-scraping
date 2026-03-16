@@ -1,5 +1,14 @@
 import { getPool } from './index.js';
 
+/** Normalize price: comma to dot, return as number (no rounding). */
+function priceToNum(val: unknown): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : null;
+  const s = String(val).replace(/,/g, '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 export interface ProductWithPrice {
   url: string;
   product_name: string | null;
@@ -18,15 +27,18 @@ export interface PricePoint {
   discount_pct: number | null;
 }
 
-/** Search products by partial name, url, category, shop. Returns latest price per product. */
+/** Search products by partial name, url, shops (multiple), shop-category pairs (multiple), price range. Supports offset for pagination. */
 export async function searchProducts(params: {
   q?: string;
   url?: string;
-  category?: string;
-  shop?: string;
+  shops?: string[];
+  pairs?: { shop: string; category: string }[];
+  priceMin?: number;
+  priceMax?: number;
   limit?: number;
+  offset?: number;
 }): Promise<ProductWithPrice[]> {
-  const { q, url, category, shop, limit = 50 } = params;
+  const { q, url, shops = [], pairs = [], priceMin, priceMax, limit = 50, offset = 0 } = params;
   const p = getPool();
 
   const conditions: string[] = ['1=1'];
@@ -38,23 +50,46 @@ export async function searchProducts(params: {
     values.push(`%${q.trim()}%`);
     idx++;
   }
+  if (shops.length > 0) {
+    conditions.push(`p.shop = ANY($${idx}::text[])`);
+    values.push(shops);
+    idx++;
+  }
+  if (pairs.length > 0) {
+    const pairShops = pairs.map((x) => x.shop);
+    const pairCats = pairs.map((x) => x.category);
+    conditions.push(`(p.shop, p.category) IN (SELECT s, c FROM unnest($${idx}::text[], $${idx + 1}::text[]) AS t(s, c))`);
+    values.push(pairShops, pairCats);
+    idx += 2;
+  }
   if (url && url.trim()) {
     conditions.push(`p.url ILIKE $${idx}`);
     values.push(`%${url.trim()}%`);
     idx++;
   }
-  if (category && category.trim()) {
-    conditions.push(`p.category ILIKE $${idx}`);
-    values.push(`%${category.trim()}%`);
+  if (priceMin != null && Number.isFinite(priceMin)) {
+    conditions.push(`(par.price IS NOT NULL AND par.price >= $${idx})`);
+    values.push(priceMin);
     idx++;
   }
-  if (shop && shop.trim()) {
-    conditions.push(`p.shop ILIKE $${idx}`);
-    values.push(`%${shop.trim()}%`);
+  if (priceMax != null && Number.isFinite(priceMax)) {
+    conditions.push(`(par.price IS NOT NULL AND par.price <= $${idx})`);
+    values.push(priceMax);
     idx++;
   }
 
-  values.push(limit);
+  const qTrim = q?.trim();
+  const hasQ = Boolean(qTrim);
+  if (hasQ) {
+    values.push(`${qTrim}%`, `%${qTrim}%`);
+    idx += 2;
+  }
+  values.push(limit, Math.max(0, offset));
+  const limitParam = idx;
+  const offsetParam = idx + 1;
+  const orderBy = hasQ
+    ? `ORDER BY CASE WHEN p.product_name ILIKE $${idx - 2} THEN 0 WHEN p.product_name ILIKE $${idx - 1} THEN 1 ELSE 2 END, p.product_name ASC NULLS LAST`
+    : 'ORDER BY p.product_name ASC NULLS LAST';
   const sql = `
     WITH latest AS (
       SELECT DISTINCT ON (product_url) product_url, date, price, discount
@@ -63,7 +98,7 @@ export async function searchProducts(params: {
     ),
     parsed AS (
       SELECT product_url, price,
-             NULLIF(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), '')::numeric AS price_before_discount
+             NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
       FROM latest
     )
     SELECT
@@ -83,8 +118,8 @@ export async function searchProducts(params: {
     FROM products p
     LEFT JOIN parsed par ON par.product_url = p.url
     WHERE ${conditions.join(' AND ')}
-    ORDER BY p.product_name ASC NULLS LAST
-    LIMIT $${idx}
+    ${orderBy}
+    LIMIT $${limitParam} OFFSET $${offsetParam}
   `;
 
   const res = await p.query(sql, values);
@@ -94,10 +129,31 @@ export async function searchProducts(params: {
     shop: row.shop != null ? String(row.shop) : null,
     category: row.category != null ? String(row.category) : null,
     article: row.article != null ? String(row.article) : null,
-    price: row.price != null ? Number(row.price) : null,
-    price_before_discount: row.price_before_discount != null ? Number(row.price_before_discount) : null,
+    price: priceToNum(row.price),
+    price_before_discount: priceToNum(row.price_before_discount),
     discount_pct: row.discount_pct != null ? Number(row.discount_pct) : null,
   }));
+}
+
+export async function getShops(): Promise<string[]> {
+  const res = await getPool().query(
+    'SELECT DISTINCT shop FROM products WHERE shop IS NOT NULL AND TRIM(shop) <> \'\' ORDER BY shop'
+  );
+  return (res.rows as { shop: string }[]).map((r) => r.shop);
+}
+
+export interface ShopCategoryPair {
+  shop: string;
+  category: string;
+}
+
+export async function getShopCategoryPairs(): Promise<ShopCategoryPair[]> {
+  const res = await getPool().query(
+    `SELECT DISTINCT shop, category FROM products
+     WHERE shop IS NOT NULL AND TRIM(shop) <> '' AND category IS NOT NULL AND TRIM(category) <> ''
+     ORDER BY shop, category`
+  );
+  return (res.rows as { shop: string; category: string }[]).map((r) => ({ shop: r.shop, category: r.category }));
 }
 
 /** Price history for one product in date range. */
@@ -110,7 +166,7 @@ export async function getPriceHistory(
   const res = await p.query(
     `WITH parsed AS (
        SELECT date, price,
-              NULLIF(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), '')::numeric AS price_before_discount
+              NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
        FROM prices
        WHERE product_url = $1 AND date >= $2 AND date <= $3
      )
@@ -126,8 +182,8 @@ export async function getPriceHistory(
   );
   return (res.rows as Record<string, unknown>[]).map((row) => ({
     date: String(row.date),
-    price: row.price != null ? Number(row.price) : null,
-    price_before_discount: row.price_before_discount != null ? Number(row.price_before_discount) : null,
+    price: priceToNum(row.price),
+    price_before_discount: priceToNum(row.price_before_discount),
     discount_pct: row.discount_pct != null ? Number(row.discount_pct) : null,
   }));
 }

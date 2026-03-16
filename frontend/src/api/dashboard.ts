@@ -9,9 +9,12 @@ function authHeaders(token: string | null): HeadersInit {
 export interface SearchParams {
   q?: string;
   url?: string;
-  category?: string;
-  shop?: string;
+  shops?: string[];
+  pairs?: { shop: string; category: string }[];
+  priceMin?: number;
+  priceMax?: number;
   limit?: number;
+  offset?: number;
 }
 
 export async function searchProducts(
@@ -21,14 +24,42 @@ export async function searchProducts(
   const sp = new URLSearchParams();
   if (params.q) sp.set('q', params.q);
   if (params.url) sp.set('url', params.url);
-  if (params.category) sp.set('category', params.category);
-  if (params.shop) sp.set('shop', params.shop);
+  (params.shops ?? []).forEach((s) => sp.append('shop', s));
+  (params.pairs ?? []).forEach((p) => sp.append('pair', `${p.shop}|${p.category}`));
+  if (params.priceMin != null && Number.isFinite(params.priceMin)) sp.set('priceMin', String(params.priceMin));
+  if (params.priceMax != null && Number.isFinite(params.priceMax)) sp.set('priceMax', String(params.priceMax));
   if (params.limit != null) sp.set('limit', String(params.limit));
+  if (params.offset != null && params.offset > 0) sp.set('offset', String(params.offset));
   const res = await fetch(`${API_BASE}/api/products?${sp}`, {
     headers: authHeaders(token),
     credentials: 'include',
   });
   if (!res.ok) throw new Error(await res.text().catch(() => 'Search failed'));
+  return res.json();
+}
+
+export async function fetchShops(token: string | null): Promise<{ shops: string[] }> {
+  const res = await fetch(`${API_BASE}/api/products/shops`, {
+    headers: authHeaders(token),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Shops failed'));
+  return res.json();
+}
+
+export interface ShopCategoryPair {
+  shop: string;
+  category: string;
+}
+
+export async function fetchShopCategoryPairs(
+  token: string | null
+): Promise<{ pairs: ShopCategoryPair[] }> {
+  const res = await fetch(`${API_BASE}/api/products/shop-category-pairs`, {
+    headers: authHeaders(token),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Pairs failed'));
   return res.json();
 }
 
@@ -115,4 +146,13 @@ export async function removeProductFromList(
     { method: 'DELETE', headers: authHeaders(token), credentials: 'include' }
   );
   if (!res.ok) throw new Error(await res.text().catch(() => 'Remove failed'));
+}
+
+export async function clearListItems(token: string | null, listId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/me/lists/${encodeURIComponent(listId)}/items`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Clear failed'));
 }

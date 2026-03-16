@@ -1,19 +1,68 @@
 import { Router, type Request, type Response } from 'express';
-import { searchProducts, getPriceHistory } from '../db/products.js';
+import { searchProducts, getPriceHistory, getShops, getShopCategoryPairs } from '../db/products.js';
 
 const router = Router();
 
-/** GET /api/products?q=&url=&category=&shop=&limit= - search products with latest price. */
+/** GET /api/products/shops - distinct shops for multi-select */
+router.get('/shops', async (_req: Request, res: Response) => {
+  try {
+    const shops = await getShops();
+    res.json({ shops });
+  } catch (err) {
+    console.error('Shops error:', err);
+    res.status(500).json({ error: 'Failed to load shops' });
+  }
+});
+
+/** GET /api/products/shop-category-pairs - distinct (shop, category) for "Shop - Category" multi-select */
+router.get('/shop-category-pairs', async (_req: Request, res: Response) => {
+  try {
+    const pairs = await getShopCategoryPairs();
+    res.json({ pairs });
+  } catch (err) {
+    console.error('Shop-category pairs error:', err);
+    res.status(500).json({ error: 'Failed to load pairs' });
+  }
+});
+
+/** GET /api/products?q=&url=&shop=&shop=...&pair=&pair=...&priceMin=&priceMax=&limit=&offset= - search. shop and pair can repeat. */
 router.get('/', async (req: Request, res: Response) => {
   const q = typeof req.query.q === 'string' ? req.query.q : undefined;
   const url = typeof req.query.url === 'string' ? req.query.url : undefined;
-  const category = typeof req.query.category === 'string' ? req.query.category : undefined;
-  const shop = typeof req.query.shop === 'string' ? req.query.shop : undefined;
+  const rawShops = req.query.shop;
+  const shops = Array.isArray(rawShops)
+    ? (rawShops as string[]).map((s) => String(s).trim()).filter(Boolean)
+    : typeof rawShops === 'string' && rawShops.trim()
+      ? [rawShops.trim()]
+      : [];
+  const rawPairs = req.query.pair;
+  const pairStrs = Array.isArray(rawPairs)
+    ? (rawPairs as string[]).filter((s) => typeof s === 'string' && s.includes('|'))
+    : typeof rawPairs === 'string' && rawPairs.includes('|')
+      ? [rawPairs]
+      : [];
+  const pairs = pairStrs.map((s) => {
+    const [shop, category] = s.split('|');
+    return { shop: (shop ?? '').trim(), category: (category ?? '').trim() };
+  }).filter((p) => p.shop && p.category);
+  const priceMin = typeof req.query.priceMin === 'string' ? parseFloat(req.query.priceMin) : undefined;
+  const priceMax = typeof req.query.priceMax === 'string' ? parseFloat(req.query.priceMax) : undefined;
   const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
   const safeLimit = Number.isFinite(limit) && limit > 0 && limit <= 200 ? limit : 50;
+  const offset = typeof req.query.offset === 'string' ? parseInt(req.query.offset, 10) : 0;
+  const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
 
   try {
-    const products = await searchProducts({ q, url, category, shop, limit: safeLimit });
+    const products = await searchProducts({
+      q,
+      url,
+      shops: shops.length > 0 ? shops : undefined,
+      pairs: pairs.length > 0 ? pairs : undefined,
+      priceMin: Number.isFinite(priceMin) ? priceMin : undefined,
+      priceMax: Number.isFinite(priceMax) ? priceMax : undefined,
+      limit: safeLimit,
+      offset: safeOffset,
+    });
     res.json({ products });
   } catch (err) {
     console.error('Search products error:', err);

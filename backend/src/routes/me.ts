@@ -9,6 +9,7 @@ import {
   deleteList,
   addListItem,
   removeListItem,
+  clearListItems,
 } from '../db/lists.js';
 
 const router = Router();
@@ -81,6 +82,14 @@ router.delete('/lists/:id', async (req: Request, res: Response) => {
     res.status(404).json({ error: 'List not found' });
     return;
   }
+  res.status(204).send();
+});
+
+/** DELETE /api/me/lists/:id/items - clear all items from list */
+router.delete('/lists/:id/items', async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const listId = req.params.id;
+  await clearListItems(listId, userId);
   res.status(204).send();
 });
 

@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import TablePage from './pages/TablePage';
+import GraphPage from './pages/GraphPage';
 import Layout from './components/Layout';
 import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
@@ -27,7 +28,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<TablePage />} />
+        <Route path="graph" element={<GraphPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

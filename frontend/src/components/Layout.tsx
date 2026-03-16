@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function todayStr(): string {
@@ -7,6 +7,8 @@ function todayStr(): string {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const isDashboard = location.pathname === '/' || location.pathname === '/graph';
 
   const hasAccess =
     user?.isPaid &&
@@ -23,6 +25,14 @@ export default function Layout() {
       <header className="header">
         <div className="header-inner">
           <span className="logo">Cloud Shop</span>
+          <nav className="header-nav">
+            <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')} end>
+              Table
+            </NavLink>
+            <NavLink to="/graph" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}>
+              Graph
+            </NavLink>
+          </nav>
           <div className="header-user">
             {subscriptionLabel && (
               <span className="subscription-badge">{subscriptionLabel}</span>
@@ -34,7 +44,7 @@ export default function Layout() {
           </div>
         </div>
       </header>
-      <div className="content">
+      <div className={`content ${isDashboard ? 'content--wide' : ''}`}>
         <Outlet />
       </div>
     </div>

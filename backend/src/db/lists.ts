@@ -1,6 +1,15 @@
 import { getPool } from './index.js';
 import type { ProductWithPrice } from './products.js';
 
+/** Normalize price: comma to dot, return as number (no rounding). */
+function priceToNum(val: unknown): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : null;
+  const s = String(val).replace(/,/g, '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 export interface UserList {
   id: string;
   user_id: string;
@@ -57,11 +66,17 @@ export async function createList(
   name: string,
   description?: string | null
 ): Promise<UserList> {
-  const res = await getPool().query(
+  const pool = getPool();
+  const nextOrder = await pool.query(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM user_lists WHERE user_id = $1',
+    [userId]
+  );
+  const sortOrder = Number((nextOrder.rows[0] as { next_order: number }).next_order);
+  const res = await pool.query(
     `INSERT INTO user_lists (user_id, name, description, sort_order)
-     VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM user_lists WHERE user_id = $1))
+     VALUES ($1, $2, $3, $4)
      RETURNING id, user_id, name, description, sort_order, created_at, updated_at`,
-    [userId, name, description ?? null]
+    [userId, name, description ?? null, sortOrder]
   );
   return rowToList(res.rows[0]);
 }
@@ -135,7 +150,7 @@ export async function getListWithItems(listId: string, userId: string): Promise<
         ),
         parsed AS (
           SELECT price,
-                 NULLIF(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), '')::numeric AS price_before_discount
+                 NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
           FROM latest
         )
         SELECT p.url, p.product_name, p.shop, p.category, p.article,
@@ -159,8 +174,8 @@ export async function getListWithItems(listId: string, userId: string): Promise<
             shop: row.shop != null ? String(row.shop) : null,
             category: row.category != null ? String(row.category) : null,
             article: row.article != null ? String(row.article) : null,
-            price: row.price != null ? Number(row.price) : null,
-            price_before_discount: row.price_before_discount != null ? Number(row.price_before_discount) : null,
+            price: priceToNum(row.price),
+            price_before_discount: priceToNum(row.price_before_discount),
             discount_pct: row.discount_pct != null ? Number(row.discount_pct) : null,
           }
         : undefined;
@@ -210,4 +225,14 @@ export async function removeListItem(
     [listId, productUrl, userId]
   );
   return (res.rowCount ?? 0) > 0;
+}
+
+export async function clearListItems(listId: string, userId: string): Promise<boolean> {
+  const res = await getPool().query(
+    `DELETE FROM user_list_items li
+     USING user_lists l
+     WHERE li.list_id = l.id AND l.id = $1 AND l.user_id = $2`,
+    [listId, userId]
+  );
+  return (res.rowCount ?? 0) >= 0;
 }

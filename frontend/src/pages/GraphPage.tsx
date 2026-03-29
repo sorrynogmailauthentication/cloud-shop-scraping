@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -10,26 +10,27 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import type { ProductWithPrice } from '../types/dashboard';
-import { searchProducts, fetchPriceHistory } from '../api/dashboard';
+import type { UserListItem } from '../types/dashboard';
+import { fetchPriceHistoryBatched } from '../api/dashboard';
+import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
+import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { useUserListEditor } from '../hooks/useUserListEditor';
+import {
+  TABLE_DATE_ANCHOR_YMD,
+  defaultTimelineRange,
+  enforceTimelineGap,
+  expandPriceFetchWindow,
+  formatYmdDisplay,
+  priceClosestByYmd,
+  timelineIdxToYmd,
+  timelineMaxIdx,
+} from '../utils/priceHistory';
+import { obscureProductDisplayName } from '../utils/productDisplay';
+import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
-
-function dateRange(range: '7d' | '14d' | '30d'): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  if (range === '7d') from.setDate(from.getDate() - 7);
-  else if (range === '14d') from.setDate(from.getDate() - 14);
-  else from.setDate(from.getDate() - 30);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
-}
-
-const CHART_COLORS = ['#f0b429', '#58a6ff', '#3fb950', '#d2a8ff', '#ff7b72'];
 
 export default function GraphPage() {
   const { user, token } = useAuth();
@@ -58,70 +59,126 @@ export default function GraphPage() {
 
   return (
     <main className="dashboard graph-page">
-      <h2>Price history</h2>
+      <h2>Graph</h2>
       <GraphContent token={token} />
     </main>
   );
 }
 
 function GraphContent({ token }: { token: string | null }) {
-  const [chartRange, setChartRange] = useState<'7d' | '14d' | '30d'>('7d');
-  const [chartProducts, setChartProducts] = useState<{ url: string; name: string }[]>([]);
-  const [chartSearchResults, setChartSearchResults] = useState<ProductWithPrice[]>([]);
-  const [chartSearchQ, setChartSearchQ] = useState('');
+  const {
+    lists,
+    currentListId,
+    setCurrentListId,
+    listWithItems,
+    listLoading,
+    pendingItems,
+    setPendingItems,
+    displayItems,
+    inListUrls,
+    saveTableName,
+    setSaveTableName,
+    tableToolsBusy,
+    handleSaveTableCopy,
+    handleDeleteTable,
+    handleClearTable: clearListRows,
+    addOneToList,
+    handleAddAllFromSearch,
+  } = useUserListEditor(token);
+
+  const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
+  const [dateRange, setDateRange] = useState(() =>
+    defaultTimelineRange(timelineMaxIdx(TABLE_DATE_ANCHOR_YMD))
+  );
+
+  useEffect(() => {
+    setDateRange((r) => enforceTimelineGap(r.start, r.end, timelineMax));
+  }, [timelineMax]);
+
+  const fromYmd = useMemo(
+    () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.start),
+    [dateRange.start]
+  );
+  const toYmd = useMemo(
+    () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.end),
+    [dateRange.end]
+  );
+  const fromDateLabel = useMemo(() => formatYmdDisplay(fromYmd), [fromYmd]);
+  const toDateLabel = useMemo(() => formatYmdDisplay(toYmd), [toYmd]);
+
   const [chartData, setChartData] = useState<{ date: string; [key: string]: string | number | null }[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
+  const [chartError, setChartError] = useState('');
 
-  const runChartSearch = async () => {
-    setChartSearchResults([]);
-    if (!chartSearchQ.trim()) return;
-    try {
-      const { products } = await searchProducts(token, { q: chartSearchQ, limit: 20 });
-      setChartSearchResults(products);
-    } catch {
-      setChartSearchResults([]);
-    }
+  const chartItemsKey = useMemo(
+    () => displayItems.map((i) => i.product_url).join('\0'),
+    [displayItems]
+  );
+
+  const removeFromList = (productUrl: string) => {
+    if (!currentListId) return;
+    const base = pendingItems ?? listWithItems?.items ?? [];
+    setPendingItems(base.filter((i) => i.product_url !== productUrl));
   };
 
-  const addProductToChart = (product: ProductWithPrice) => {
-    if (chartProducts.some((p) => p.url === product.url)) return;
-    setChartProducts((prev) => [
-      ...prev,
-      { url: product.url, name: product.product_name || product.url.slice(0, 40) },
-    ]);
-    setChartSearchResults([]);
-    setChartSearchQ('');
-  };
-
-  const removeProductFromChart = (url: string) => {
-    setChartProducts((prev) => prev.filter((p) => p.url !== url));
-  };
-
-  const clearGraph = () => {
-    setChartProducts([]);
+  const handleClearRows = () => {
+    clearListRows();
   };
 
   useEffect(() => {
-    if (!token || chartProducts.length === 0) {
+    if (!token || displayItems.length === 0) {
       setChartData([]);
+      setChartError('');
+      setChartLoading(false);
       return;
     }
-    const { from, to } = dateRange(chartRange);
+    let cancelled = false;
     setChartLoading(true);
-    fetchPriceHistory(token, chartProducts.map((p) => p.url), from, to)
+    setChartError('');
+    const urls = displayItems.map((i) => i.product_url);
+    const { fetchFrom, fetchTo } = expandPriceFetchWindow(
+      fromYmd,
+      toYmd,
+      TABLE_DATE_ANCHOR_YMD,
+      todayStr()
+    );
+    fetchPriceHistoryBatched(token, urls, fetchFrom, fetchTo)
       .then(({ results }) => {
+        if (cancelled) return;
+        const byUrl = new Map(results.map((r) => [r.product_url, r.history]));
         const byDate = new Map<string, Record<string, string | number | null>>();
-        results.forEach((r, idx) => {
+
+        const ensureRow = (d: string) => {
+          let row = byDate.get(d);
+          if (!row) {
+            row = { date: d };
+            byDate.set(d, row);
+          }
+          return row;
+        };
+
+        displayItems.forEach((item, idx) => {
           const key = `p${idx}`;
-          r.history.forEach((pt) => {
-            let row = byDate.get(pt.date);
-            if (!row) {
-              row = { date: pt.date };
-              byDate.set(pt.date, row);
-            }
+          const hist = byUrl.get(item.product_url) ?? [];
+          for (const pt of hist) {
+            const d = pt.date.slice(0, 10);
+            if (d < fromYmd || d > toYmd) continue;
+            if (pt.price == null) continue;
+            const row = ensureRow(d);
             row[key] = pt.price;
-          });
+          }
+          const atStart = priceClosestByYmd(hist, fromYmd);
+          const atEnd = priceClosestByYmd(hist, toYmd);
+          if (atStart != null) {
+            const row = ensureRow(fromYmd);
+            if (row[key] == null) row[key] = atStart;
+          }
+          if (atEnd != null) {
+            const row = ensureRow(toYmd);
+            if (row[key] == null) row[key] = atEnd;
+          }
         });
+
         const sorted = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const out = sorted.map(([, row]) => {
           const obj: { date: string; [key: string]: string | number | null } = { date: row.date as string };
@@ -130,95 +187,182 @@ function GraphContent({ token }: { token: string | null }) {
         });
         setChartData(out);
       })
-      .catch(() => setChartData([]))
-      .finally(() => setChartLoading(false));
-  }, [token, chartProducts, chartRange]);
+      .catch((e) => {
+        if (!cancelled) {
+          setChartData([]);
+          setChartError(e instanceof Error ? e.message : 'Failed to load chart');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setChartLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, chartItemsKey, fromYmd, toYmd]);
+
+  const lineLabel = (item: UserListItem) =>
+    obscureProductDisplayName(item.product?.product_name, item.product_url);
 
   return (
-    <div className="graph-page-layout">
-      <div className="chart-controls">
-        <select
-          className="range-select"
-          value={chartRange}
-          onChange={(e) => setChartRange(e.target.value as '7d' | '14d' | '30d')}
-        >
-          <option value="7d">7 days</option>
-          <option value="14d">14 days</option>
-          <option value="30d">30 days</option>
-        </select>
-        <div className="chart-search">
-          <input
-            type="text"
-            placeholder="Search product to add to graph…"
-            value={chartSearchQ}
-            onChange={(e) => setChartSearchQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && runChartSearch()}
-            className="search-input"
-          />
-          <button type="button" className="btn-primary btn-search" onClick={runChartSearch}>
-            Search
-          </button>
-        </div>
-        {chartProducts.length > 0 && (
-          <button type="button" className="btn-clear-graph" onClick={clearGraph}>
-            Clear graph
-          </button>
-        )}
-      </div>
-      {chartSearchResults.length > 0 && (
-        <ul className="chart-search-results">
-          {chartSearchResults.map((p) => (
-            <li key={p.url}>
-              <span className="cell-wrap">{p.product_name || p.url}</span>
-              <button type="button" className="btn-add-one" onClick={() => addProductToChart(p)}>
-                Add to graph
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="chart-products">
-        {chartProducts.map((p, i) => (
-          <span key={p.url} className="chart-tag" style={{ borderColor: CHART_COLORS[i % CHART_COLORS.length] }}>
-            <span className="cell-wrap">{p.name}</span>
-            <button type="button" className="chart-tag-remove" onClick={() => removeProductFromChart(p.url)}>
-              ✕
-            </button>
-          </span>
-        ))}
-      </div>
-      {chartLoading && <p className="muted">Loading chart…</p>}
-      {chartData.length > 0 && !chartLoading && (
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height={360}>
-            <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
-                labelStyle={{ color: 'var(--text)' }}
+    <div className="table-page-layout graph-page-layout">
+      <ProductSearchPanel
+        token={token}
+        existingUrls={inListUrls}
+        addDisabled={!currentListId}
+        onAddOne={addOneToList}
+        onAddAll={handleAddAllFromSearch}
+        addAllLabel="Add all loaded to graph"
+        addOneTitle="Add to graph"
+        alreadyInPhrase="graph"
+      />
+
+      <section className="table-section graph-chart-section">
+        <div className="table-toolbar-wrap">
+          <div className="table-toolbar">
+            <label className="table-toolbar-field">
+              <span className="table-toolbar-label">Table</span>
+              <select
+                className="list-select table-toolbar-select"
+                value={currentListId ?? ''}
+                onChange={(e) => setCurrentListId(e.target.value || null)}
+                disabled={lists.length === 0 || tableToolsBusy}
+              >
+                {lists.length === 0 ? (
+                  <option value="">No tables</option>
+                ) : (
+                  lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <label className="table-toolbar-field table-toolbar-field--grow">
+              <span className="table-toolbar-label">Name</span>
+              <input
+                type="text"
+                className="search-input table-toolbar-name"
+                value={saveTableName}
+                onChange={(e) => setSaveTableName(e.target.value)}
+                placeholder="My table"
+                disabled={tableToolsBusy}
+                autoComplete="off"
               />
-              <Legend />
-              {chartProducts.map((p, i) => (
-                <Line
-                  key={p.url}
-                  type="monotone"
-                  dataKey={`p${i}`}
-                  name={p.name.length > 25 ? p.name.slice(0, 25) + '…' : p.name}
-                  stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+            </label>
+            <div className="table-toolbar-actions">
+              <button
+                type="button"
+                className="btn-add-all"
+                disabled={tableToolsBusy || !saveTableName.trim()}
+                onClick={() => void handleSaveTableCopy()}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="btn-clear-table"
+                disabled={tableToolsBusy || !currentListId}
+                onClick={() => void handleDeleteTable()}
+              >
+                Delete
+              </button>
+              {currentListId && (
+                <button type="button" className="btn-clear-table" onClick={handleClearRows} disabled={tableToolsBusy}>
+                  Clear rows
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-      {chartProducts.length === 0 && !chartLoading && (
-        <p className="widget-hint">Search and add products to see price history.</p>
-      )}
+
+        {pendingItems !== null && (
+          <p className="widget-hint">Unsaved row changes — click Save to write them to the server.</p>
+        )}
+        {!currentListId && lists.length === 0 && (
+          <p className="widget-hint muted">Loading your table…</p>
+        )}
+        {listLoading && <p className="muted">Loading…</p>}
+
+        {listWithItems && !listLoading && displayItems.length > 0 && (
+          <DateRangeSlicerPanel
+            timelineMax={timelineMax}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            fromYmd={fromYmd}
+            toYmd={toYmd}
+            fromDateLabel={fromDateLabel}
+            toDateLabel={toDateLabel}
+            loading={chartLoading}
+            error={chartError || null}
+          />
+        )}
+
+        {listWithItems && !listLoading && displayItems.length > 0 && (
+          <div className="graph-selected-toolbar">
+            <div className="chart-products">
+              {displayItems.map((item, i) => (
+                <span
+                  key={item.product_url}
+                  className="chart-tag"
+                  style={{ borderColor: CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length] }}
+                >
+                  <span className="cell-wrap">
+                    {obscureProductDisplayName(item.product?.product_name, item.product_url)}
+                  </span>
+                  <button
+                    type="button"
+                    className="chart-tag-remove"
+                    onClick={() => removeFromList(item.product_url)}
+                    title="Remove from list"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length > 0 && !chartLoading && (
+          <div className="chart-container table-wrap">
+            <ResponsiveContainer width="100%" height={360}>
+              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
+                  labelStyle={{ color: 'var(--text)' }}
+                />
+                <Legend />
+                {displayItems.map((item, i) => (
+                  <Line
+                    key={item.product_url}
+                    type="monotone"
+                    dataKey={`p${i}`}
+                    name={lineLabel(item)}
+                    stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]}
+                    strokeDasharray={chartSeriesStrokeDash(i)}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length === 0 && !chartLoading && !chartError && (
+          <p className="widget-hint muted">No price points in this date range.</p>
+        )}
+
+        {listWithItems && !listLoading && displayItems.length === 0 && (
+          <p className="widget-hint">Search and add products, then adjust the date range. Save to persist the list.</p>
+        )}
+      </section>
     </div>
   );
 }

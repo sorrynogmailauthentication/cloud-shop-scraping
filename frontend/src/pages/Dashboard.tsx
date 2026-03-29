@@ -21,6 +21,8 @@ import {
   removeProductFromList,
 } from '../api/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
+import { obscureProductDisplayName } from '../utils/productDisplay';
+import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -37,8 +39,6 @@ function dateRange(range: '7d' | '14d' | '30d'): { from: string; to: string } {
     to: to.toISOString().slice(0, 10),
   };
 }
-
-const CHART_COLORS = ['#f0b429', '#58a6ff', '#3fb950', '#d2a8ff', '#ff7b72'];
 
 export default function Dashboard() {
   const { user, token } = useAuth();
@@ -224,7 +224,7 @@ function DashboardContent({ token }: { token: string | null }) {
     if (chartProducts.some((p) => p.url === product.url)) return;
     setChartProducts((prev) => [
       ...prev,
-      { url: product.url, name: product.product_name || product.url.slice(0, 40) },
+      { url: product.url, name: product.product_name || product.url },
     ]);
     setChartSearchResults([]);
     setChartSearchQ('');
@@ -320,7 +320,7 @@ function DashboardContent({ token }: { token: string | null }) {
         <div className="search-results">
           {searchResults.slice(0, 30).map((p) => (
             <div key={p.url} className="search-result-row">
-              <span className="result-name">{p.product_name || p.url}</span>
+              <span className="result-name">{obscureProductDisplayName(p.product_name, p.url)}</span>
               <span className="result-price">
                 {p.price != null ? formatPriceDisplay(p.price) : '—'}
                 {p.discount_pct != null && ` (−${p.discount_pct}%)`}
@@ -369,7 +369,7 @@ function DashboardContent({ token }: { token: string | null }) {
               <tbody>
                 {listWithItems.items.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.product?.product_name ?? item.product_url.slice(0, 50)}</td>
+                    <td>{obscureProductDisplayName(item.product?.product_name, item.product_url)}</td>
                     <td>
                       <a href={item.product_url} target="_blank" rel="noopener noreferrer" className="table-link">
                         Link
@@ -435,7 +435,7 @@ function DashboardContent({ token }: { token: string | null }) {
           <ul className="chart-search-results">
             {chartSearchResults.map((p) => (
               <li key={p.url}>
-                <span>{p.product_name || p.url}</span>
+                <span>{obscureProductDisplayName(p.product_name, p.url)}</span>
                 <button type="button" className="btn-add-one" onClick={() => addProductToChart(p)}>
                   Add to graph
                 </button>
@@ -445,8 +445,8 @@ function DashboardContent({ token }: { token: string | null }) {
         )}
         <div className="chart-products">
           {chartProducts.map((p, i) => (
-            <span key={p.url} className="chart-tag" style={{ borderColor: CHART_COLORS[i % CHART_COLORS.length] }}>
-              {p.name}
+            <span key={p.url} className="chart-tag" style={{ borderColor: CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length] }}>
+              {obscureProductDisplayName(p.name, p.url)}
               <button type="button" className="chart-tag-remove" onClick={() => removeProductFromChart(p.url)}>
                 ✕
               </button>
@@ -471,8 +471,9 @@ function DashboardContent({ token }: { token: string | null }) {
                     key={p.url}
                     type="monotone"
                     dataKey={`p${i}`}
-                    name={p.name.length > 25 ? p.name.slice(0, 25) + '…' : p.name}
-                    stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                    name={obscureProductDisplayName(p.name, p.url)}
+                    stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]}
+                    strokeDasharray={chartSeriesStrokeDash(i)}
                     strokeWidth={2}
                     dot={{ r: 3 }}
                     connectNulls

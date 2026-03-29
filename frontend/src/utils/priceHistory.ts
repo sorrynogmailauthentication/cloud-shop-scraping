@@ -132,3 +132,42 @@ export function deltaPctNumeric(p0: number | null, p1: number | null): number | 
   if (Math.abs(p0) < 1e-9) return null;
   return ((p1 - p0) / p0) * 100;
 }
+
+/** Calendar add for `YYYY-MM-DD` strings (local date). */
+export function addDaysYmd(ymd: string, deltaDays: number): string {
+  const s = ymd.slice(0, 10);
+  const [y, m, d] = s.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  t.setHours(0, 0, 0, 0);
+  t.setDate(t.getDate() + deltaDays);
+  const yy = t.getFullYear();
+  const mm = String(t.getMonth() + 1).padStart(2, '0');
+  const dd = String(t.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Clamp `ymd` to [minYmd, maxYmd] inclusive. */
+export function clampYmdBetween(ymd: string, minYmd: string, maxYmd: string): string {
+  const x = ymd.slice(0, 10);
+  const lo = minYmd.slice(0, 10);
+  const hi = maxYmd.slice(0, 10);
+  if (x.localeCompare(lo) < 0) return lo;
+  if (x.localeCompare(hi) > 0) return hi;
+  return x;
+}
+
+/** Widen [fromYmd, toYmd] so the API returns neighbors for nearest-date price at the boundaries. */
+export function expandPriceFetchWindow(
+  fromYmd: string,
+  toYmd: string,
+  anchorYmd: string,
+  maxYmd: string,
+  bufferDays = 400
+): { fetchFrom: string; fetchTo: string } {
+  const rawFrom = addDaysYmd(fromYmd, -bufferDays);
+  const rawTo = addDaysYmd(toYmd, bufferDays);
+  return {
+    fetchFrom: clampYmdBetween(rawFrom, anchorYmd, maxYmd),
+    fetchTo: clampYmdBetween(rawTo, anchorYmd, maxYmd),
+  };
+}

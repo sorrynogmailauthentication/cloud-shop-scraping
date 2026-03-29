@@ -1,20 +1,11 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import type { ProductWithPrice, ListWithItems, UserList, UserListItem } from '../types/dashboard';
-import {
-  searchProducts,
-  fetchShops,
-  fetchShopCategoryPairs,
-  fetchMyLists,
-  fetchListWithItems,
-  createList,
-  deleteListApi,
-  addProductToList,
-  clearListItems,
-  fetchPriceHistoryBatched,
-} from '../api/dashboard';
-import type { ShopCategoryPair } from '../api/dashboard';
+import type { UserListItem } from '../types/dashboard';
+import { fetchPriceHistoryBatched } from '../api/dashboard';
+import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
+import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { useUserListEditor } from '../hooks/useUserListEditor';
 import type { PricePoint } from '../types/dashboard';
 import {
   TABLE_DATE_ANCHOR_YMD,
@@ -29,6 +20,7 @@ import {
   formatPriceDisplay,
   formatYmdDisplay,
 } from '../utils/priceHistory';
+import { obscureProductDisplayName } from '../utils/productDisplay';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -59,17 +51,6 @@ function cmpNullableNum(a: number | null, b: number | null, dir: 'asc' | 'desc')
   if (b == null) return -1;
   const diff = a - b;
   return dir === 'asc' ? diff : -diff;
-}
-
-function rowFromSearchProduct(p: ProductWithPrice, listId: string, seq: number): UserListItem {
-  return {
-    id: -(Date.now() + seq),
-    list_id: listId,
-    product_url: p.url,
-    position: seq,
-    created_at: new Date().toISOString(),
-    product: p,
-  };
 }
 
 function SortableTh({
@@ -148,47 +129,26 @@ export default function TablePage() {
 }
 
 function TableContent({ token }: { token: string | null }) {
-  const [searchOpen, setSearchOpen] = useState(true);
-  const SEARCH_PAGE_SIZE = 20;
-  const [searchQ, setSearchQ] = useState('');
-  const [searchUrl, setSearchUrl] = useState('');
-  const [searchShops, setSearchShops] = useState<string[]>([]);
-  const [searchCategoryPairs, setSearchCategoryPairs] = useState<string[]>([]);
-  const [priceAbove, setPriceAbove] = useState('');
-  const [priceBelow, setPriceBelow] = useState('');
-  const [shops, setShops] = useState<string[]>([]);
-  const [shopCategoryPairs, setShopCategoryPairs] = useState<ShopCategoryPair[]>([]);
-  const [resultFilterName1, setResultFilterName1] = useState('');
-  const [resultFilterName2, setResultFilterName2] = useState('');
-  const [resultFilterName3, setResultFilterName3] = useState('');
-  const [searchResults, setSearchResults] = useState<ProductWithPrice[]>([]);
-  const [searchHasMore, setSearchHasMore] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchLoadingMore, setSearchLoadingMore] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const searchResultsRef = useRef<HTMLDivElement>(null);
-  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
-  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const shopDropdownRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const {
+    lists,
+    currentListId,
+    setCurrentListId,
+    listWithItems,
+    listLoading,
+    pendingItems,
+    setPendingItems,
+    displayItems,
+    inListUrls,
+    saveTableName,
+    setSaveTableName,
+    tableToolsBusy,
+    handleSaveTableCopy,
+    handleDeleteTable,
+    handleClearTable: clearListRows,
+    addOneToList,
+    handleAddAllFromSearch,
+  } = useUserListEditor(token);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        shopDropdownRef.current && !shopDropdownRef.current.contains(e.target as Node)
-      ) setShopDropdownOpen(false);
-      if (
-        categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)
-      ) setCategoryDropdownOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const [lists, setLists] = useState<UserList[]>([]);
-  const [currentListId, setCurrentListId] = useState<string | null>(null);
-  const [listWithItems, setListWithItems] = useState<ListWithItems | null>(null);
-  const [listLoading, setListLoading] = useState(false);
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() =>
     defaultTimelineRange(timelineMaxIdx(TABLE_DATE_ANCHOR_YMD))
@@ -203,158 +163,11 @@ function TableContent({ token }: { token: string | null }) {
   const tableSelectMouseDownRef = useRef(false);
   const tableDragAnchorRef = useRef<number | null>(null);
   const tableItemsWrapRef = useRef<HTMLDivElement>(null);
-  const [saveTableName, setSaveTableName] = useState('');
-  const [tableToolsBusy, setTableToolsBusy] = useState(false);
-  const saveNameSyncedForListIdRef = useRef<string | null>(null);
-  /** Local edits not yet written with Save (add/remove/clear). */
-  const [pendingItems, setPendingItems] = useState<UserListItem[] | null>(null);
-
-  const loadLists = useCallback(async () => {
-    if (!token) return;
-    try {
-      let { lists: L } = await fetchMyLists(token);
-      if (L.length === 0) {
-        try {
-          const { list } = await createList(token, 'My table', null);
-          L = [list];
-        } catch {
-          const { lists: again } = await fetchMyLists(token);
-          L = again;
-        }
-      }
-      setLists(L);
-      setCurrentListId((prev) => {
-        if (L.length === 0) return null;
-        if (prev && L.some((l) => l.id === prev)) return prev;
-        return L[0].id;
-      });
-    } catch {
-      setLists([]);
-      setCurrentListId(null);
-    }
-  }, [token]);
-
-  const loadListWithItems = useCallback(async (options?: { silent?: boolean; forListId?: string | null }) => {
-    const id = options?.forListId !== undefined ? options.forListId : currentListId;
-    if (!token || !id) {
-      if (options?.forListId === undefined) setListWithItems(null);
-      return;
-    }
-    const silent = options?.silent ?? false;
-    if (!silent) setListLoading(true);
-    try {
-      const { list } = await fetchListWithItems(token, id);
-      setListWithItems(list);
-    } catch {
-      if (options?.forListId === undefined) setListWithItems(null);
-    } finally {
-      if (!silent) setListLoading(false);
-    }
-  }, [token, currentListId]);
-
-  useEffect(() => {
-    loadLists();
-  }, [loadLists]);
-
-  useEffect(() => {
-    loadListWithItems();
-  }, [loadListWithItems]);
 
   useEffect(() => {
     setTableSort({ key: null, dir: null });
     setSelectedUrls(new Set());
-    setPendingItems(null);
   }, [currentListId]);
-
-  useEffect(() => {
-    if (!listWithItems || listWithItems.id !== currentListId) return;
-    if (saveNameSyncedForListIdRef.current === listWithItems.id) return;
-    saveNameSyncedForListIdRef.current = listWithItems.id;
-    setSaveTableName(listWithItems.name);
-  }, [currentListId, listWithItems]);
-
-  useEffect(() => {
-    if (!searchOpen || !token) return;
-    fetchShops(token).then(({ shops: s }) => setShops(s)).catch(() => setShops([]));
-    fetchShopCategoryPairs(token).then(({ pairs: p }) => setShopCategoryPairs(p)).catch(() => setShopCategoryPairs([]));
-  }, [searchOpen, token]);
-
-  const shopsFiltered = useMemo(() => {
-    if (searchCategoryPairs.length === 0) return shops;
-    const shopsInSelectedPairs = new Set(searchCategoryPairs.map((k) => k.split('|')[0]));
-    return shops.filter((s) => shopsInSelectedPairs.has(s));
-  }, [shops, searchCategoryPairs]);
-
-  const categoryPairsFiltered = useMemo(() => {
-    if (searchShops.length === 0) return shopCategoryPairs;
-    return shopCategoryPairs.filter((p) => searchShops.includes(p.shop));
-  }, [shopCategoryPairs, searchShops]);
-
-  const displayItems = useMemo(
-    () => pendingItems ?? listWithItems?.items ?? [],
-    [pendingItems, listWithItems?.items]
-  );
-
-  const runSearch = async () => {
-    setSearchError('');
-    setSearchLoading(true);
-    const pairs = searchCategoryPairs
-      .map((key) => {
-        const [shop, category] = key.split('|');
-        return shop && category ? { shop, category } : null;
-      })
-      .filter((p): p is { shop: string; category: string } => p != null);
-    try {
-      const { products } = await searchProducts(token, {
-        q: searchQ || undefined,
-        url: searchUrl || undefined,
-        shops: searchShops.length > 0 ? searchShops : undefined,
-        pairs: pairs.length > 0 ? pairs : undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset: 0,
-      });
-      setSearchResults(products);
-      setSearchHasMore(products.length === SEARCH_PAGE_SIZE);
-    } catch (e) {
-      setSearchError(e instanceof Error ? e.message : 'Search failed');
-      setSearchResults([]);
-      setSearchHasMore(false);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const loadMoreSearch = useCallback(async () => {
-    if (!token || searchLoadingMore || !searchHasMore) return;
-    const pairs = searchCategoryPairs
-      .map((key) => {
-        const [shop, category] = key.split('|');
-        return shop && category ? { shop, category } : null;
-      })
-      .filter((p): p is { shop: string; category: string } => p != null);
-    setSearchLoadingMore(true);
-    try {
-      const { products } = await searchProducts(token, {
-        q: searchQ || undefined,
-        url: searchUrl || undefined,
-        shops: searchShops.length > 0 ? searchShops : undefined,
-        pairs: pairs.length > 0 ? pairs : undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset: searchResults.length,
-      });
-      setSearchResults((prev) => [...prev, ...products]);
-      setSearchHasMore(products.length === SEARCH_PAGE_SIZE);
-    } catch {
-      setSearchHasMore(false);
-    } finally {
-      setSearchLoadingMore(false);
-    }
-  }, [token, searchQ, searchUrl, searchShops, searchCategoryPairs, searchResults.length, searchHasMore, searchLoadingMore]);
-
-  const inListUrls = useMemo(
-    () => new Set(displayItems.map((i) => i.product_url)),
-    [displayItems]
-  );
 
   useEffect(() => {
     setDateRange((r) => enforceTimelineGap(r.start, r.end, timelineMax));
@@ -409,25 +222,6 @@ function TableContent({ token }: { token: string | null }) {
       window.clearTimeout(timer);
     };
   }, [token, tableUrlsKey, fromYmd, toYmd]);
-
-  /** Rows from the current in-memory search pages only (never fetches more from the API). */
-  const filteredSearchResults = useMemo(() => {
-    let list = searchResults.filter((p) => !inListUrls.has(p.url));
-    const nameNeedles = [resultFilterName1, resultFilterName2, resultFilterName3]
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    if (nameNeedles.length > 0) {
-      list = list.filter((p) => {
-        const hay = (p.product_name ?? '').toLowerCase();
-        return nameNeedles.every((n) => hay.includes(n));
-      });
-    }
-    const minP = priceAbove.trim() ? parseFloat(priceAbove) : null;
-    const maxP = priceBelow.trim() ? parseFloat(priceBelow) : null;
-    if (Number.isFinite(minP)) list = list.filter((p) => p.price != null && p.price >= minP!);
-    if (Number.isFinite(maxP)) list = list.filter((p) => p.price != null && p.price <= maxP!);
-    return list;
-  }, [searchResults, inListUrls, resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]);
 
   const cycleTableSort = useCallback((key: TableSortColumn) => {
     setTableSort((prev) => {
@@ -590,43 +384,6 @@ function TableContent({ token }: { token: string | null }) {
     [applyRowRangeSelection]
   );
 
-  const handleSearchResultsScroll = useCallback(() => {
-    const el = searchResultsRef.current;
-    if (!el || searchLoadingMore || !searchHasMore) return;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    if (scrollTop + clientHeight >= scrollHeight - 80) {
-      loadMoreSearch();
-    }
-  }, [loadMoreSearch, searchLoadingMore, searchHasMore]);
-
-  const addAllToTable = async () => {
-    if (!currentListId) return;
-    const toAdd = filteredSearchResults.slice();
-    const moreOnServer = searchHasMore;
-    if (toAdd.length === 0) return;
-    const base = pendingItems ?? listWithItems?.items ?? [];
-    const existingUrls = new Set(base.map((i) => i.product_url));
-    let next = [...base];
-    let seq = next.length;
-    for (const p of toAdd) {
-      if (existingUrls.has(p.url)) continue;
-      existingUrls.add(p.url);
-      next.push(rowFromSearchProduct(p, currentListId, seq));
-      seq += 1;
-    }
-    setPendingItems(next);
-    if (moreOnServer) {
-      await loadMoreSearch();
-    }
-  };
-
-  const addOneToTable = async (product: ProductWithPrice) => {
-    if (!currentListId) return;
-    const base = pendingItems ?? listWithItems?.items ?? [];
-    if (base.some((i) => i.product_url === product.url)) return;
-    setPendingItems([...base, rowFromSearchProduct(product, currentListId, base.length)]);
-  };
-
   const removeFromTable = (productUrl: string) => {
     if (!currentListId) return;
     const base = pendingItems ?? listWithItems?.items ?? [];
@@ -646,452 +403,19 @@ function TableContent({ token }: { token: string | null }) {
   };
 
   const handleClearTable = () => {
-    if (!currentListId) return;
-    setPendingItems([]);
+    clearListRows();
     setSelectedUrls(new Set());
-  };
-
-  const handleSaveTableCopy = async () => {
-    const name = saveTableName.trim();
-    if (!token || !name) return;
-    const nameKey = name.toLowerCase();
-    const existing = lists.find((l) => l.name.trim().toLowerCase() === nameKey);
-
-    setTableToolsBusy(true);
-    try {
-      if (currentListId && pendingItems !== null) {
-        await clearListItems(token, currentListId);
-        for (const url of pendingItems.map((i) => i.product_url)) {
-          try {
-            await addProductToList(token, currentListId, url);
-          } catch {
-            /* skip */
-          }
-        }
-        setPendingItems(null);
-        await loadListWithItems({ silent: true, forListId: currentListId });
-      }
-
-      let urls: string[] = [];
-      if (currentListId) {
-        const { list: source } = await fetchListWithItems(token, currentListId);
-        urls = source.items.map((i) => i.product_url);
-      }
-
-      if (existing) {
-        await clearListItems(token, existing.id);
-        for (const url of urls) {
-          try {
-            await addProductToList(token, existing.id, url);
-          } catch {
-            /* skip */
-          }
-        }
-        setCurrentListId(existing.id);
-        const { lists: L } = await fetchMyLists(token);
-        setLists(L);
-      } else {
-        const { list: created } = await createList(token, name, null);
-        for (const url of urls) {
-          try {
-            await addProductToList(token, created.id, url);
-          } catch {
-            /* skip */
-          }
-        }
-        setCurrentListId(created.id);
-        const { lists: L } = await fetchMyLists(token);
-        setLists(L);
-      }
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setTableToolsBusy(false);
-    }
-  };
-
-  const handleDeleteTable = async () => {
-    if (!token || !currentListId) return;
-    const label = lists.find((l) => l.id === currentListId)?.name ?? 'this table';
-    if (!window.confirm(`Delete “${label}”?`)) return;
-    setTableToolsBusy(true);
-    setPendingItems(null);
-    try {
-      const id = currentListId;
-      await deleteListApi(token, id);
-      let { lists: L } = await fetchMyLists(token);
-      if (L.length === 0) {
-        try {
-          const { list } = await createList(token, 'My table', null);
-          L = [list];
-        } catch {
-          const { lists: again } = await fetchMyLists(token);
-          L = again;
-        }
-      }
-      setLists(L);
-      setCurrentListId((prev) => (prev === id ? L[0]?.id ?? null : prev));
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Delete failed');
-    } finally {
-      setTableToolsBusy(false);
-    }
   };
 
   return (
     <div className="table-page-layout">
-      <section className={`search-panel ${searchOpen ? 'search-panel-open' : ''}`}>
-        <button
-          type="button"
-          className="search-panel-toggle"
-          onClick={() => setSearchOpen((o) => !o)}
-          aria-expanded={searchOpen}
-        >
-          {searchOpen ? '▼ Close search' : '▶ Search products'}
-        </button>
-        {searchOpen && (
-          <div className="search-panel-inner">
-            <p className="widget-hint">
-              By name, shop(s), category (Shop - Category), or URL. Use ✕ on each field to clear; shops and
-              categories reset to all.
-            </p>
-            <div className="search-form">
-              <div className="search-field-with-clear search-field-with-clear--name">
-                <input
-                  type="text"
-                  placeholder="Name (partial)"
-                  value={searchQ}
-                  onChange={(e) => setSearchQ(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                  className="search-input search-input-name"
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!searchQ.trim()}
-                  onClick={() => setSearchQ('')}
-                  aria-label="Clear name"
-                  title="Clear name"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--shop">
-              <div className="search-dropdown-wrap search-dropdown-wrap--shop" ref={shopDropdownRef}>
-                <label className="search-multi-label">Shop</label>
-                <button
-                  type="button"
-                  className="search-dropdown-trigger"
-                  onClick={() => setShopDropdownOpen((o) => !o)}
-                  aria-expanded={shopDropdownOpen}
-                >
-                  {searchShops.length === 0 ? 'All shops' : searchShops.length === 1 ? searchShops[0] : `${searchShops.length} shops`}
-                </button>
-                {shopDropdownOpen && (
-                  <div className="search-dropdown-panel">
-                    <label className="search-dropdown-option search-dropdown-all">
-                      <input
-                        type="checkbox"
-                        checked={searchShops.length === 0}
-                        onChange={() => setSearchShops([])}
-                      />
-                      <span>All shops</span>
-                    </label>
-                    {shopsFiltered.map((s) => (
-                      <label key={s} className="search-dropdown-option">
-                        <input
-                          type="checkbox"
-                          checked={searchShops.includes(s)}
-                          onChange={() => {
-                            setSearchShops((prev) =>
-                              prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                            );
-                          }}
-                        />
-                        <span>{s}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={searchShops.length === 0}
-                  onClick={() => {
-                    setSearchShops([]);
-                    setShopDropdownOpen(false);
-                  }}
-                  aria-label="Reset shops to all"
-                  title="All shops"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--categories">
-              <div className="search-dropdown-wrap search-dropdown-wrap--categories" ref={categoryDropdownRef}>
-                <label className="search-multi-label">Shop - Category</label>
-                <button
-                  type="button"
-                  className="search-dropdown-trigger search-dropdown-trigger--categories"
-                  onClick={() => setCategoryDropdownOpen((o) => !o)}
-                  aria-expanded={categoryDropdownOpen}
-                >
-                  {searchCategoryPairs.length === 0
-                    ? 'All categories'
-                    : searchCategoryPairs.length === 1
-                      ? (() => {
-                          const p = shopCategoryPairs.find((x) => `${x.shop}|${x.category}` === searchCategoryPairs[0]);
-                          return p ? `${p.shop} - ${p.category}` : '1 category';
-                        })()
-                      : `${searchCategoryPairs.length} categories`}
-                </button>
-                {categoryDropdownOpen && (
-                  <div className="search-dropdown-panel search-dropdown-panel--categories">
-                    <label className="search-dropdown-option search-dropdown-all">
-                      <input
-                        type="checkbox"
-                        checked={searchCategoryPairs.length === 0}
-                        onChange={() => setSearchCategoryPairs([])}
-                      />
-                      <span>All categories</span>
-                    </label>
-                    {categoryPairsFiltered.map((p) => {
-                      const key = `${p.shop}|${p.category}`;
-                      return (
-                        <label key={key} className="search-dropdown-option">
-                          <input
-                            type="checkbox"
-                            checked={searchCategoryPairs.includes(key)}
-                            onChange={() => {
-                              setSearchCategoryPairs((prev) =>
-                                prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
-                              );
-                            }}
-                          />
-                          <span>{p.shop} - {p.category}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={searchCategoryPairs.length === 0}
-                  onClick={() => {
-                    setSearchCategoryPairs([]);
-                    setCategoryDropdownOpen(false);
-                  }}
-                  aria-label="Reset categories to all"
-                  title="All categories"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--url">
-                <input
-                  type="text"
-                  placeholder="URL (partial)"
-                  value={searchUrl}
-                  onChange={(e) => setSearchUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                  className="search-input search-input-url"
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!searchUrl.trim()}
-                  onClick={() => setSearchUrl('')}
-                  aria-label="Clear URL"
-                  title="Clear URL"
-                >
-                  ✕
-                </button>
-              </div>
-              <button type="button" className="btn-primary btn-search" onClick={runSearch} disabled={searchLoading}>
-                {searchLoading ? 'Searching…' : 'Search'}
-              </button>
-            </div>
-            {searchError && <div className="widget-error">{searchError}</div>}
-            <div className="search-filter-block">
-              <div className="search-field-with-clear search-field-with-clear--filter-text">
-                <input
-                  type="text"
-                  placeholder="Name contains (1)"
-                  value={resultFilterName1}
-                  onChange={(e) => setResultFilterName1(e.target.value)}
-                  className="search-input search-filter-text"
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!resultFilterName1.trim()}
-                  onClick={() => setResultFilterName1('')}
-                  aria-label="Clear name filter 1"
-                  title="Clear"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--filter-text">
-                <input
-                  type="text"
-                  placeholder="Name contains (2)"
-                  value={resultFilterName2}
-                  onChange={(e) => setResultFilterName2(e.target.value)}
-                  className="search-input search-filter-text"
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!resultFilterName2.trim()}
-                  onClick={() => setResultFilterName2('')}
-                  aria-label="Clear name filter 2"
-                  title="Clear"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--filter-text">
-                <input
-                  type="text"
-                  placeholder="Name contains (3)"
-                  value={resultFilterName3}
-                  onChange={(e) => setResultFilterName3(e.target.value)}
-                  className="search-input search-filter-text"
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!resultFilterName3.trim()}
-                  onClick={() => setResultFilterName3('')}
-                  aria-label="Clear name filter 3"
-                  title="Clear"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-filter-price-group">
-                <div className="search-field-with-clear search-field-with-clear--filter-num">
-                  <input
-                    type="number"
-                    placeholder="Price above (min)"
-                    value={priceAbove}
-                    onChange={(e) => setPriceAbove(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                    className="search-input search-input-num"
-                    min={0}
-                    step={0.01}
-                  />
-                  <button
-                    type="button"
-                    className="search-field-clear"
-                    disabled={!priceAbove.trim()}
-                    onClick={() => setPriceAbove('')}
-                    aria-label="Clear min price"
-                    title="Clear"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="search-field-with-clear search-field-with-clear--filter-num">
-                  <input
-                    type="number"
-                    placeholder="Price below (max)"
-                    value={priceBelow}
-                    onChange={(e) => setPriceBelow(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                    className="search-input search-input-num"
-                    min={0}
-                    step={0.01}
-                  />
-                  <button
-                    type="button"
-                    className="search-field-clear"
-                    disabled={!priceBelow.trim()}
-                    onClick={() => setPriceBelow('')}
-                    aria-label="Clear max price"
-                    title="Clear"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-            {searchResults.length > 0 && (
-              <>
-                <div className="search-actions">
-                  <button
-                    type="button"
-                    className="btn-add-all"
-                    onClick={addAllToTable}
-                    disabled={filteredSearchResults.length === 0}
-                    title="Adds only products already shown in this list. If more search pages exist, the next page loads automatically after adding."
-                  >
-                    Add all loaded to table
-                  </button>
-                  {searchHasMore && filteredSearchResults.length > 0 && (
-                    <p className="muted search-add-all-hint">
-                      Only loaded rows are added; the next page loads after add all when more exist. Scroll for further pages.
-                    </p>
-                  )}
-                </div>
-                <div
-                  className="search-results"
-                  ref={searchResultsRef}
-                  onScroll={handleSearchResultsScroll}
-                >
-                  {filteredSearchResults.map((p) => (
-                    <div key={p.url} className="search-result-row search-result-row--table">
-                      <span className="result-name">{p.product_name || p.url}</span>
-                      <div className="result-shop-stack">
-                        <span className="result-shop-main">{p.shop ?? '—'}</span>
-                        {p.category ? (
-                          <span className="result-shop-category">{p.category}</span>
-                        ) : null}
-                      </div>
-                      <div className="result-price-stack">
-                        <span className="result-price-main">
-                          {p.price != null ? formatPriceDisplay(p.price) : '—'}
-                        </span>
-                        {(p.price_before_discount != null || p.discount_pct != null) && (
-                          <span className="result-price-sub">
-                            {p.price_before_discount != null && (
-                              <span className="result-price-was">{formatPriceDisplay(p.price_before_discount)}</span>
-                            )}
-                            {p.discount_pct != null && (
-                              <span className="result-price-pct">
-                                {p.price_before_discount != null ? ' ' : ''}({p.discount_pct}%)
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <button type="button" className="btn-add-one" onClick={() => addOneToTable(p)} title="Add to table">
-                        + Add
-                      </button>
-                    </div>
-                  ))}
-                  {searchHasMore && (
-                    <div className="search-load-more">
-                      {searchLoadingMore ? (
-                        <span className="muted">Loading…</span>
-                      ) : (
-                        <span className="muted">Scroll for more</span>
-                      )}
-                    </div>
-                  )}
-                  {filteredSearchResults.length === 0 && searchResults.length > 0 && (
-                    <p className="muted">No matches for filter or all are already in the table.</p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </section>
+      <ProductSearchPanel
+        token={token}
+        existingUrls={inListUrls}
+        addDisabled={!currentListId}
+        onAddOne={addOneToList}
+        onAddAll={handleAddAllFromSearch}
+      />
 
       <section className="table-section">
         <div className="table-toolbar-wrap">
@@ -1166,69 +490,17 @@ function TableContent({ token }: { token: string | null }) {
         )}
         {listLoading && <p className="muted">Loading…</p>}
         {listWithItems && !listLoading && displayItems.length > 0 && (
-          <div className="date-range-slicer-panel">
-            <div className="date-range-slicer-panel-head">
-              <span className="date-range-slicer-title">Date range</span>
-              <span className="date-range-slicer-selection" aria-live="polite">
-                <time dateTime={fromYmd}>{fromDateLabel}</time>
-                <span className="date-range-slicer-arrow" aria-hidden>
-                  →
-                </span>
-                <time dateTime={toYmd}>{toDateLabel}</time>
-              </span>
-              {histLoading && <span className="muted date-range-slicer-status">…</span>}
-            </div>
-            {histError && <div className="widget-error date-range-slicer-error">{histError}</div>}
-            <div className="date-range-slicer">
-              <div className="date-range-slicer-rail" aria-hidden />
-              <div
-                className="date-range-slicer-fill"
-                aria-hidden
-                style={
-                  timelineMax <= 0
-                    ? { left: 'var(--slicer-inset)', width: 'calc(100% - 2 * var(--slicer-inset))' }
-                    : {
-                        left: `calc(var(--slicer-inset) + (100% - 2 * var(--slicer-inset)) * ${dateRange.start / timelineMax})`,
-                        width: `calc((100% - 2 * var(--slicer-inset)) * ${(dateRange.end - dateRange.start) / timelineMax})`,
-                      }
-                }
-              />
-              <input
-                type="range"
-                className="date-range-slicer-thumb date-range-slicer-thumb--from"
-                min={0}
-                max={timelineMax}
-                value={dateRange.start}
-                onChange={(e) => {
-                  const n = Math.round(Number(e.target.value));
-                  setDateRange((prev) => enforceTimelineGap(n, prev.end, timelineMax));
-                }}
-                aria-label={`Start of range, ${fromDateLabel}`}
-              />
-              <input
-                type="range"
-                className="date-range-slicer-thumb date-range-slicer-thumb--to"
-                min={0}
-                max={timelineMax}
-                value={dateRange.end}
-                onChange={(e) => {
-                  const n = Math.round(Number(e.target.value));
-                  setDateRange((prev) => enforceTimelineGap(prev.start, n, timelineMax));
-                }}
-                aria-label={`End of range, ${toDateLabel}`}
-              />
-            </div>
-            <div className="date-range-slicer-ticks">
-              <div className="date-range-slicer-tick">
-                <span className="date-range-slicer-tick-role">Start</span>
-                <time dateTime={fromYmd}>{fromDateLabel}</time>
-              </div>
-              <div className="date-range-slicer-tick">
-                <span className="date-range-slicer-tick-role">End</span>
-                <time dateTime={toYmd}>{toDateLabel}</time>
-              </div>
-            </div>
-          </div>
+          <DateRangeSlicerPanel
+            timelineMax={timelineMax}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            fromYmd={fromYmd}
+            toYmd={toYmd}
+            fromDateLabel={fromDateLabel}
+            toDateLabel={toDateLabel}
+            loading={histLoading}
+            error={histError || null}
+          />
         )}
         {listWithItems && !listLoading && (
           <div className="table-wrap table-full-width" ref={tableItemsWrapRef}>
@@ -1319,7 +591,9 @@ function TableContent({ token }: { token: string | null }) {
                       onMouseDown={(e) => handleTableRowMouseDown(e, index)}
                       onMouseEnter={() => handleTableRowMouseEnter(index)}
                     >
-                      <td className="cell-wrap">{item.product?.product_name ?? item.product_url}</td>
+                      <td className="cell-wrap">
+                        {obscureProductDisplayName(item.product?.product_name, item.product_url)}
+                      </td>
                       <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>
                       <td className="cell-wrap table-col-category">{item.product?.category ?? '—'}</td>
                       <td>

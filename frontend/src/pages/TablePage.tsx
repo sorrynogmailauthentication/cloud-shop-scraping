@@ -27,6 +27,7 @@ import {
   formatDeltaPctOnly,
   formatDeltaPriceOnly,
   formatPriceDisplay,
+  formatYmdDisplay,
 } from '../utils/priceHistory';
 
 function todayStr(): string {
@@ -147,7 +148,7 @@ export default function TablePage() {
 }
 
 function TableContent({ token }: { token: string | null }) {
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(true);
   const SEARCH_PAGE_SIZE = 20;
   const [searchQ, setSearchQ] = useState('');
   const [searchUrl, setSearchUrl] = useState('');
@@ -367,6 +368,8 @@ function TableContent({ token }: { token: string | null }) {
     () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.end),
     [dateRange.end]
   );
+  const fromDateLabel = useMemo(() => formatYmdDisplay(fromYmd), [fromYmd]);
+  const toDateLabel = useMemo(() => formatYmdDisplay(toYmd), [toYmd]);
   const tableUrlsKey = useMemo(
     () => [...new Set(displayItems.map((i) => i.product_url))].sort().join('\0'),
     [displayItems]
@@ -1092,62 +1095,62 @@ function TableContent({ token }: { token: string | null }) {
 
       <section className="table-section">
         <div className="table-toolbar-wrap">
-        <div className="table-toolbar">
-          <label className="table-toolbar-field">
-            <span className="table-toolbar-label">Load</span>
-            <select
-              className="list-select table-toolbar-select"
-              value={currentListId ?? ''}
-              onChange={(e) => setCurrentListId(e.target.value || null)}
-              disabled={lists.length === 0 || tableToolsBusy}
-            >
-              {lists.length === 0 ? (
-                <option value="">No tables</option>
-              ) : (
-                lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-          <label className="table-toolbar-field table-toolbar-field--grow">
-            <span className="table-toolbar-label">Name</span>
-            <input
-              type="text"
-              className="search-input table-toolbar-name"
-              value={saveTableName}
-              onChange={(e) => setSaveTableName(e.target.value)}
-              placeholder="Table name"
-              disabled={tableToolsBusy}
-              autoComplete="off"
-            />
-          </label>
-          <div className="table-toolbar-actions">
-            <button
-              type="button"
-              className="btn-add-all"
-              disabled={tableToolsBusy || !saveTableName.trim()}
-              onClick={() => void handleSaveTableCopy()}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="btn-clear-table"
-              disabled={tableToolsBusy || !currentListId}
-              onClick={() => void handleDeleteTable()}
-            >
-              Delete
-            </button>
-            {currentListId && (
-              <button type="button" className="btn-clear-table" onClick={handleClearTable} disabled={tableToolsBusy}>
-                Clear rows
+          <div className="table-toolbar">
+            <label className="table-toolbar-field">
+              <span className="table-toolbar-label">Table</span>
+              <select
+                className="list-select table-toolbar-select"
+                value={currentListId ?? ''}
+                onChange={(e) => setCurrentListId(e.target.value || null)}
+                disabled={lists.length === 0 || tableToolsBusy}
+              >
+                {lists.length === 0 ? (
+                  <option value="">No tables</option>
+                ) : (
+                  lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <label className="table-toolbar-field table-toolbar-field--grow">
+              <span className="table-toolbar-label">Name</span>
+              <input
+                type="text"
+                className="search-input table-toolbar-name"
+                value={saveTableName}
+                onChange={(e) => setSaveTableName(e.target.value)}
+                placeholder="My table"
+                disabled={tableToolsBusy}
+                autoComplete="off"
+              />
+            </label>
+            <div className="table-toolbar-actions">
+              <button
+                type="button"
+                className="btn-add-all"
+                disabled={tableToolsBusy || !saveTableName.trim()}
+                onClick={() => void handleSaveTableCopy()}
+              >
+                Save
               </button>
-            )}
+              <button
+                type="button"
+                className="btn-clear-table"
+                disabled={tableToolsBusy || !currentListId}
+                onClick={() => void handleDeleteTable()}
+              >
+                Delete
+              </button>
+              {currentListId && (
+                <button type="button" className="btn-clear-table" onClick={handleClearTable} disabled={tableToolsBusy}>
+                  Clear rows
+                </button>
+              )}
+            </div>
           </div>
-        </div>
         </div>
         {listWithItems && displayItems.length > 0 && (
           <p className="widget-hint table-select-hint">
@@ -1166,7 +1169,13 @@ function TableContent({ token }: { token: string | null }) {
           <div className="date-range-slicer-panel">
             <div className="date-range-slicer-panel-head">
               <span className="date-range-slicer-title">Date range</span>
-              <span className="muted date-range-slicer-anchor">from {TABLE_DATE_ANCHOR_YMD}</span>
+              <span className="date-range-slicer-selection" aria-live="polite">
+                <time dateTime={fromYmd}>{fromDateLabel}</time>
+                <span className="date-range-slicer-arrow" aria-hidden>
+                  →
+                </span>
+                <time dateTime={toYmd}>{toDateLabel}</time>
+              </span>
               {histLoading && <span className="muted date-range-slicer-status">…</span>}
             </div>
             {histError && <div className="widget-error date-range-slicer-error">{histError}</div>}
@@ -1194,7 +1203,7 @@ function TableContent({ token }: { token: string | null }) {
                   const n = Math.round(Number(e.target.value));
                   setDateRange((prev) => enforceTimelineGap(n, prev.end, timelineMax));
                 }}
-                aria-label="Range start"
+                aria-label={`Start of range, ${fromDateLabel}`}
               />
               <input
                 type="range"
@@ -1206,12 +1215,18 @@ function TableContent({ token }: { token: string | null }) {
                   const n = Math.round(Number(e.target.value));
                   setDateRange((prev) => enforceTimelineGap(prev.start, n, timelineMax));
                 }}
-                aria-label="Range end"
+                aria-label={`End of range, ${toDateLabel}`}
               />
             </div>
             <div className="date-range-slicer-ticks">
-              <time dateTime={fromYmd}>{fromYmd}</time>
-              <time dateTime={toYmd}>{toYmd}</time>
+              <div className="date-range-slicer-tick">
+                <span className="date-range-slicer-tick-role">Start</span>
+                <time dateTime={fromYmd}>{fromDateLabel}</time>
+              </div>
+              <div className="date-range-slicer-tick">
+                <span className="date-range-slicer-tick-role">End</span>
+                <time dateTime={toYmd}>{toDateLabel}</time>
+              </div>
             </div>
           </div>
         )}
@@ -1267,25 +1282,25 @@ function TableContent({ token }: { token: string | null }) {
                     columnKey="atStart"
                     sort={tableSort}
                     onSort={cycleTableSort}
-                    title={`Closest price to ${fromYmd}`}
+                    title={`Closest price to ${fromDateLabel}`}
                   >
-                    <abbr title={`Closest price to ${fromYmd}`}>@ start</abbr>
+                    <abbr title={`Closest price to ${fromDateLabel}`}>@ start</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="deltaPrice"
                     sort={tableSort}
                     onSort={cycleTableSort}
-                    title={`Price change, ${fromYmd} → ${toYmd}`}
+                    title={`Price change, ${fromDateLabel} → ${toDateLabel}`}
                   >
-                    <abbr title={`Price change, ${fromYmd} → ${toYmd}`}>Δ price</abbr>
+                    <abbr title={`Price change, ${fromDateLabel} → ${toDateLabel}`}>Δ price</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="deltaPct"
                     sort={tableSort}
                     onSort={cycleTableSort}
-                    title={`Percent change, ${fromYmd} → ${toYmd}`}
+                    title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}
                   >
-                    <abbr title={`Percent change, ${fromYmd} → ${toYmd}`}>Δ %</abbr>
+                    <abbr title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}>Δ %</abbr>
                   </SortableTh>
                   <th className="sort-th--narrow" aria-label="Remove" />
                 </tr>

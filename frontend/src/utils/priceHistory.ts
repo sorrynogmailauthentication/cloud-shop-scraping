@@ -3,6 +3,20 @@ import type { PricePoint } from '../types/dashboard';
 /** Earliest selectable day on the timeline (absolute). */
 export const TABLE_DATE_ANCHOR_YMD = '2026-03-25';
 
+/** Format `YYYY-MM-DD` for UI (e.g. "25 Mar 2026"). */
+export function formatYmdDisplay(ymd: string): string {
+  const s = ymd.slice(0, 10);
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return ymd;
+  const t = new Date(y, m - 1, d);
+  if (Number.isNaN(t.getTime())) return ymd;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(t);
+}
+
 export function timelineIdxToYmd(anchorYmd: string, dayIndex: number): string {
   const [y, m, d] = anchorYmd.split('-').map(Number);
   const t = new Date(y, m - 1, d);

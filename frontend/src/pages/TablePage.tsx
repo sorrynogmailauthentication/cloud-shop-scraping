@@ -11,8 +11,20 @@ import {
   addProductToList,
   removeProductFromList,
   clearListItems,
+  fetchPriceHistoryBatched,
 } from '../api/dashboard';
 import type { ShopCategoryPair } from '../api/dashboard';
+import type { PricePoint } from '../types/dashboard';
+import {
+  TABLE_DATE_ANCHOR_YMD,
+  timelineIdxToYmd,
+  timelineMaxIdx,
+  defaultTimelineRange,
+  enforceTimelineGap,
+  priceClosestByYmd,
+  formatPriceDelta,
+  formatPriceDisplay,
+} from '../utils/priceHistory';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -91,6 +103,13 @@ function TableContent({ token }: { token: string | null }) {
   const [currentListId, setCurrentListId] = useState<string | null>(null);
   const [listWithItems, setListWithItems] = useState<ListWithItems | null>(null);
   const [listLoading, setListLoading] = useState(false);
+  const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
+  const [dateRange, setDateRange] = useState(() =>
+    defaultTimelineRange(timelineMaxIdx(TABLE_DATE_ANCHOR_YMD))
+  );
+  const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
+  const [histLoading, setHistLoading] = useState(false);
+  const [histError, setHistError] = useState('');
 
   const loadLists = useCallback(async () => {
     if (!token) return;
@@ -218,6 +237,58 @@ function TableContent({ token }: { token: string | null }) {
     () => new Set((listWithItems?.items ?? []).map((i) => i.product_url)),
     [listWithItems?.items]
   );
+
+  useEffect(() => {
+    setDateRange((r) => enforceTimelineGap(r.start, r.end, timelineMax));
+  }, [timelineMax]);
+
+  const fromYmd = useMemo(
+    () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.start),
+    [dateRange.start]
+  );
+  const toYmd = useMemo(
+    () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.end),
+    [dateRange.end]
+  );
+  const tableUrlsKey = useMemo(
+    () => [...new Set((listWithItems?.items ?? []).map((i) => i.product_url))].sort().join('\0'),
+    [listWithItems?.items]
+  );
+
+  useEffect(() => {
+    if (!token || !listWithItems?.items?.length) {
+      setHistByUrl(new Map());
+      setHistLoading(false);
+      setHistError('');
+      return;
+    }
+    const urls = [...new Set(listWithItems.items.map((i) => i.product_url))];
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setHistLoading(true);
+      setHistError('');
+      fetchPriceHistoryBatched(token, urls, fromYmd, toYmd)
+        .then(({ results }) => {
+          if (cancelled) return;
+          const m = new Map<string, PricePoint[]>();
+          results.forEach((r) => m.set(r.product_url, r.history));
+          setHistByUrl(m);
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setHistByUrl(new Map());
+            setHistError(e instanceof Error ? e.message : 'Failed to load prices');
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setHistLoading(false);
+        });
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [token, tableUrlsKey, fromYmd, toYmd]);
 
   const filteredSearchResults = useMemo(() => {
     let list = searchResults.filter((p) => !inListUrls.has(p.url));
@@ -460,7 +531,7 @@ function TableContent({ token }: { token: string | null }) {
                       <span className="result-name">{p.product_name || p.url}</span>
                       <span className="result-shop">{p.shop ?? '—'}</span>
                       <span className="result-price">
-                        {p.price != null ? String(p.price) : '—'}
+                        {p.price != null ? formatPriceDisplay(p.price) : '—'}
                         {p.discount_pct != null && ` (−${p.discount_pct}%)`}
                       </span>
                       <button type="button" className="btn-add-one" onClick={() => addOneToTable(p)} title="Add to table">
@@ -512,6 +583,59 @@ function TableContent({ token }: { token: string | null }) {
           <p className="widget-hint">Open search above and add products to create your first list.</p>
         )}
         {listLoading && <p className="muted">Loading…</p>}
+        {listWithItems && !listLoading && listWithItems.items.length > 0 && (
+          <div className="date-range-slicer-panel">
+            <div className="date-range-slicer-panel-head">
+              <span className="date-range-slicer-title">Date range</span>
+              <span className="muted date-range-slicer-anchor">from {TABLE_DATE_ANCHOR_YMD}</span>
+              {histLoading && <span className="muted date-range-slicer-status">…</span>}
+            </div>
+            {histError && <div className="widget-error date-range-slicer-error">{histError}</div>}
+            <div className="date-range-slicer">
+              <div className="date-range-slicer-rail" aria-hidden />
+              <div
+                className="date-range-slicer-fill"
+                aria-hidden
+                style={
+                  timelineMax <= 0
+                    ? { left: 'var(--slicer-inset)', width: 'calc(100% - 2 * var(--slicer-inset))' }
+                    : {
+                        left: `calc(var(--slicer-inset) + (100% - 2 * var(--slicer-inset)) * ${dateRange.start / timelineMax})`,
+                        width: `calc((100% - 2 * var(--slicer-inset)) * ${(dateRange.end - dateRange.start) / timelineMax})`,
+                      }
+                }
+              />
+              <input
+                type="range"
+                className="date-range-slicer-thumb date-range-slicer-thumb--from"
+                min={0}
+                max={timelineMax}
+                value={dateRange.start}
+                onChange={(e) => {
+                  const n = Math.round(Number(e.target.value));
+                  setDateRange((prev) => enforceTimelineGap(n, prev.end, timelineMax));
+                }}
+                aria-label="Range start"
+              />
+              <input
+                type="range"
+                className="date-range-slicer-thumb date-range-slicer-thumb--to"
+                min={0}
+                max={timelineMax}
+                value={dateRange.end}
+                onChange={(e) => {
+                  const n = Math.round(Number(e.target.value));
+                  setDateRange((prev) => enforceTimelineGap(prev.start, n, timelineMax));
+                }}
+                aria-label="Range end"
+              />
+            </div>
+            <div className="date-range-slicer-ticks">
+              <time dateTime={fromYmd}>{fromYmd}</time>
+              <time dateTime={toYmd}>{toYmd}</time>
+            </div>
+          </div>
+        )}
         {listWithItems && !listLoading && (
           <div className="table-wrap table-full-width">
             <table className="data-table">
@@ -522,33 +646,69 @@ function TableContent({ token }: { token: string | null }) {
                   <th>Price</th>
                   <th>Before discount</th>
                   <th>Discount %</th>
+                  <th>
+                    <abbr title={`Closest price to ${fromYmd}`}>@ start</abbr>
+                  </th>
+                  <th>
+                    <abbr title={`${fromYmd} → ${toYmd}`}>Δ</abbr>
+                  </th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {listWithItems.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="cell-wrap">{item.product?.product_name ?? item.product_url}</td>
-                    <td>
-                      <a href={item.product_url} target="_blank" rel="noopener noreferrer" className="table-link">
-                        Link
-                      </a>
-                    </td>
-                    <td>{item.product?.price != null ? item.product.price : '—'}</td>
-                    <td>{item.product?.price_before_discount != null ? item.product.price_before_discount : '—'}</td>
-                    <td>{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-remove"
-                        onClick={() => removeFromTable(item.product_url)}
-                        title="Remove from table"
+                {listWithItems.items.map((item) => {
+                  const h = histByUrl.get(item.product_url) ?? [];
+                  const p0 = priceClosestByYmd(h, fromYmd);
+                  const p1 = priceClosestByYmd(h, toYmd);
+                  const delta = formatPriceDelta(p0, p1);
+                  const dn = p0 != null && p1 != null ? p1 - p0 : null;
+                  return (
+                    <tr key={item.id}>
+                      <td className="cell-wrap">{item.product?.product_name ?? item.product_url}</td>
+                      <td>
+                        <a
+                          href={item.product_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="table-link"
+                        >
+                          Link
+                        </a>
+                      </td>
+                      <td>
+                        {item.product?.price != null ? formatPriceDisplay(item.product.price) : '—'}
+                      </td>
+                      <td>
+                        {item.product?.price_before_discount != null
+                          ? formatPriceDisplay(item.product.price_before_discount)
+                          : '—'}
+                      </td>
+                      <td>{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
+                      <td>{histLoading ? '…' : p0 != null ? formatPriceDisplay(p0) : '—'}</td>
+                      <td
+                        className={
+                          dn != null && dn > 0
+                            ? 'table-delta table-delta--up'
+                            : dn != null && dn < 0
+                              ? 'table-delta table-delta--down'
+                              : 'table-delta'
+                        }
                       >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        {histLoading ? '…' : delta}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-remove"
+                          onClick={() => removeFromTable(item.product_url)}
+                          title="Remove from table"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {listWithItems.items.length === 0 && (

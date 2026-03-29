@@ -84,6 +84,24 @@ export async function fetchPriceHistory(
   return res.json();
 }
 
+const PRICE_HISTORY_BATCH = 20;
+
+export async function fetchPriceHistoryBatched(
+  token: string | null,
+  productUrls: string[],
+  from: string,
+  to: string
+): Promise<{ results: PriceHistoryResult[] }> {
+  const unique = [...new Set(productUrls)];
+  const results: PriceHistoryResult[] = [];
+  for (let i = 0; i < unique.length; i += PRICE_HISTORY_BATCH) {
+    const chunk = unique.slice(i, i + PRICE_HISTORY_BATCH);
+    const { results: part } = await fetchPriceHistory(token, chunk, from, to);
+    results.push(...part);
+  }
+  return { results };
+}
+
 export async function fetchMyLists(
   token: string | null
 ): Promise<{ lists: import('../types/dashboard').UserList[] }> {

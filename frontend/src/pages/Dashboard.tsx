@@ -20,6 +20,7 @@ import {
   addProductToList,
   removeProductFromList,
 } from '../api/dashboard';
+import { formatPriceDisplay } from '../utils/priceHistory';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -321,7 +322,7 @@ function DashboardContent({ token }: { token: string | null }) {
             <div key={p.url} className="search-result-row">
               <span className="result-name">{p.product_name || p.url}</span>
               <span className="result-price">
-                {p.price != null ? `${p.price}` : '—'}
+                {p.price != null ? formatPriceDisplay(p.price) : '—'}
                 {p.discount_pct != null && ` (−${p.discount_pct}%)`}
               </span>
               <button type="button" className="btn-add-one" onClick={() => addOneToTable(p)} title="Add to table">
@@ -374,8 +375,14 @@ function DashboardContent({ token }: { token: string | null }) {
                         Link
                       </a>
                     </td>
-                    <td>{item.product?.price != null ? item.product.price : '—'}</td>
-                    <td>{item.product?.price_before_discount != null ? item.product.price_before_discount : '—'}</td>
+                    <td>
+                      {item.product?.price != null ? formatPriceDisplay(item.product.price) : '—'}
+                    </td>
+                    <td>
+                      {item.product?.price_before_discount != null
+                        ? formatPriceDisplay(item.product.price_before_discount)
+                        : '—'}
+                    </td>
                     <td>{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
                     <td>
                       <button

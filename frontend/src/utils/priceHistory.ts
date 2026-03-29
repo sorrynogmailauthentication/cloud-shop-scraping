@@ -1,0 +1,91 @@
+import type { PricePoint } from '../types/dashboard';
+
+/** Earliest selectable day on the timeline (absolute). */
+export const TABLE_DATE_ANCHOR_YMD = '2026-03-25';
+
+export function timelineIdxToYmd(anchorYmd: string, dayIndex: number): string {
+  const [y, m, d] = anchorYmd.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  t.setHours(0, 0, 0, 0);
+  t.setDate(t.getDate() + dayIndex);
+  const yy = t.getFullYear();
+  const mm = String(t.getMonth() + 1).padStart(2, '0');
+  const dd = String(t.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Index of today relative to anchor (0 = anchor day). */
+export function timelineMaxIdx(anchorYmd: string): number {
+  const [y, m, d] = anchorYmd.split('-').map(Number);
+  const anchor = new Date(y, m - 1, d);
+  anchor.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((today.getTime() - anchor.getTime()) / 86400000));
+}
+
+export function defaultTimelineRange(maxIdx: number): { start: number; end: number } {
+  if (maxIdx <= 0) return { start: 0, end: 0 };
+  return { start: 0, end: maxIdx };
+}
+
+/** Keep start < end when maxIdx ≥ 2; never both thumbs on the same calendar day if a second day exists. */
+export function enforceTimelineGap(
+  start: number,
+  end: number,
+  maxIdx: number
+): { start: number; end: number } {
+  if (maxIdx <= 0) return { start: 0, end: 0 };
+  let s = Math.max(0, Math.min(maxIdx, Math.round(start)));
+  let e = Math.max(0, Math.min(maxIdx, Math.round(end)));
+  if (s >= e) {
+    e = Math.min(maxIdx, s + 1);
+    if (e <= s) s = Math.max(0, e - 1);
+  }
+  return { start: s, end: e };
+}
+
+function ymdToUtc(ymd: string): number {
+  const s = ymd.slice(0, 10);
+  const [y, m, d] = s.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+export function priceClosestByYmd(history: PricePoint[], targetYmd: string): number | null {
+  const t = ymdToUtc(targetYmd);
+  let best: number | null = null;
+  let bestDist = Infinity;
+  let bestKey = '';
+  for (const pt of history) {
+    if (pt.price == null) continue;
+    const key = pt.date.slice(0, 10);
+    const dist = Math.abs(ymdToUtc(key) - t);
+    if (dist < bestDist || (dist === bestDist && key < bestKey)) {
+      bestDist = dist;
+      best = pt.price;
+      bestKey = key;
+    }
+  }
+  return best;
+}
+
+/** Whole-euro amounts show two decimals (e.g. 12 → 12.00); others stay compact after cent rounding. */
+export function formatPriceDisplay(price: number): string {
+  const r = Math.round(price * 100) / 100;
+  if (Math.abs(r - Math.round(r)) < 1e-9) return Math.round(r).toFixed(2);
+  return String(parseFloat(r.toFixed(2)));
+}
+
+export function formatPriceDelta(start: number | null, end: number | null): string {
+  if (start == null || end == null) return '—';
+  const d = end - start;
+  if (Math.abs(d) < 1e-9) return '0';
+  const dR = Math.round(d * 100) / 100;
+  const main =
+    Math.abs(dR - Math.round(dR)) < 1e-9 ? Math.round(dR).toFixed(2) : String(parseFloat(dR.toFixed(2)));
+  const pctRaw = start !== 0 ? (d / start) * 100 : null;
+  if (pctRaw == null || !Number.isFinite(pctRaw)) return main;
+  const pStr =
+    Math.abs(pctRaw) >= 10 ? pctRaw.toFixed(0) : pctRaw.toFixed(1);
+  return `${main} (${pctRaw > 0 ? '+' : ''}${pStr}%)`;
+}

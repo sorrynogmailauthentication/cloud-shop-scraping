@@ -6,6 +6,17 @@ function authHeaders(token: string | null): HeadersInit {
   return h;
 }
 
+async function readApiErrorBody(res: Response): Promise<string> {
+  const t = await res.text();
+  try {
+    const j = JSON.parse(t) as { error?: string };
+    if (typeof j.error === 'string' && j.error.trim()) return j.error.trim();
+  } catch {
+    /* plain text */
+  }
+  return t.trim() || res.statusText || 'Request failed';
+}
+
 export interface SearchParams {
   q?: string;
   url?: string;
@@ -34,7 +45,7 @@ export async function searchProducts(
     headers: authHeaders(token),
     credentials: 'include',
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => 'Search failed'));
+  if (!res.ok) throw new Error(await readApiErrorBody(res));
   return res.json();
 }
 
@@ -136,8 +147,19 @@ export async function createList(
     credentials: 'include',
     body: JSON.stringify({ name, description: description ?? null }),
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => 'Create list failed'));
+  if (!res.ok) throw new Error(await readApiErrorBody(res));
   return res.json();
+}
+
+export async function deleteListApi(token: string | null, listId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/me/lists/${encodeURIComponent(listId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    credentials: 'include',
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await res.text().catch(() => 'Delete list failed'));
+  }
 }
 
 export async function addProductToList(

@@ -66,6 +66,7 @@ export async function createList(
   name: string,
   description?: string | null
 ): Promise<UserList> {
+  const trimmed = name.trim();
   const pool = getPool();
   const nextOrder = await pool.query(
     'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM user_lists WHERE user_id = $1',
@@ -76,7 +77,7 @@ export async function createList(
     `INSERT INTO user_lists (user_id, name, description, sort_order)
      VALUES ($1, $2, $3, $4)
      RETURNING id, user_id, name, description, sort_order, created_at, updated_at`,
-    [userId, name, description ?? null, sortOrder]
+    [userId, trimmed, description ?? null, sortOrder]
   );
   return rowToList(res.rows[0]);
 }
@@ -94,7 +95,7 @@ export async function updateList(
   let i = 1;
   if (updates.name !== undefined) {
     setClauses.push(`name = $${i++}`);
-    values.push(updates.name);
+    values.push(updates.name.trim());
   }
   if (updates.description !== undefined) {
     setClauses.push(`description = $${i++}`);

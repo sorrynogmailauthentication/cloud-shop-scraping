@@ -12,6 +12,15 @@ import {
   clearListItems,
 } from '../db/lists.js';
 
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code: string }).code === '23505'
+  );
+}
+
 const router = Router();
 router.use(requireAuth);
 
@@ -40,6 +49,10 @@ router.post('/lists', async (req: Request, res: Response) => {
     const list = await createList(userId, name, description || undefined);
     res.status(201).json({ list });
   } catch (err) {
+    if (isUniqueViolation(err)) {
+      res.status(409).json({ error: 'A table with this name already exists' });
+      return;
+    }
     console.error('Create list error:', err);
     res.status(500).json({ error: 'Failed to create list' });
   }
@@ -62,15 +75,28 @@ router.patch('/lists/:id', async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const listId = req.params.id;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
+  if (name !== undefined && !name) {
+    res.status(400).json({ error: 'name cannot be empty' });
+    return;
+  }
   const description = req.body?.description !== undefined
     ? (typeof req.body.description === 'string' ? req.body.description.trim() : null)
     : undefined;
-  const list = await updateList(listId, userId, { name, description });
-  if (!list) {
-    res.status(404).json({ error: 'List not found' });
-    return;
+  try {
+    const list = await updateList(listId, userId, { name, description });
+    if (!list) {
+      res.status(404).json({ error: 'List not found' });
+      return;
+    }
+    res.json({ list });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      res.status(409).json({ error: 'A table with this name already exists' });
+      return;
+    }
+    console.error('Update list error:', err);
+    res.status(500).json({ error: 'Failed to update list' });
   }
-  res.json({ list });
 });
 
 /** DELETE /api/me/lists/:id */

@@ -89,3 +89,32 @@ export function formatPriceDelta(start: number | null, end: number | null): stri
     Math.abs(pctRaw) >= 10 ? pctRaw.toFixed(0) : pctRaw.toFixed(1);
   return `${main} (${pctRaw > 0 ? '+' : ''}${pStr}%)`;
 }
+
+/** Price change only (same range as `formatPriceDelta` main part). */
+export function formatDeltaPriceOnly(start: number | null, end: number | null): string {
+  if (start == null || end == null) return '—';
+  const d = end - start;
+  if (Math.abs(d) < 1e-9) return '0';
+  const dR = Math.round(d * 100) / 100;
+  return Math.abs(dR - Math.round(dR)) < 1e-9
+    ? Math.round(dR).toFixed(2)
+    : String(parseFloat(dR.toFixed(2)));
+}
+
+/** Percent change from start to end price; — when undefined (e.g. start is 0). */
+export function formatDeltaPctOnly(start: number | null, end: number | null): string {
+  if (start == null || end == null) return '—';
+  const d = end - start;
+  if (Math.abs(d) < 1e-9) return '0%';
+  const pctRaw = start !== 0 ? (d / start) * 100 : null;
+  if (pctRaw == null || !Number.isFinite(pctRaw)) return '—';
+  const pStr =
+    Math.abs(pctRaw) >= 10 ? pctRaw.toFixed(0) : pctRaw.toFixed(1);
+  return `${pctRaw > 0 ? '+' : ''}${pStr}%`;
+}
+
+export function deltaPctNumeric(p0: number | null, p1: number | null): number | null {
+  if (p0 == null || p1 == null) return null;
+  if (Math.abs(p0) < 1e-9) return null;
+  return ((p1 - p0) / p0) * 100;
+}

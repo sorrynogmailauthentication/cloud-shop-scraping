@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fetchShops, fetchShopCategoryPairs, searchProducts } from '../api/dashboard';
 import type { ShopCategoryPair } from '../api/dashboard';
 import type { ProductWithPrice } from '../types/dashboard';
@@ -48,6 +48,8 @@ export function ProductSearchPanel({
   const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState('');
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const scrollYOnCloseRef = useRef<number | null>(null);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const shopDropdownRef = useRef<HTMLDivElement>(null);
@@ -176,12 +178,39 @@ export function ProductSearchPanel({
 
   const addBlocked = addDisabled;
 
+  const toggleSearchOpen = useCallback(() => {
+    setSearchOpen((prev) => {
+      if (prev) scrollYOnCloseRef.current = window.scrollY;
+      return !prev;
+    });
+  }, []);
+
+  /** Capture scroll before focus moves to the toggle (avoids browser scroll-into-view on mousedown). */
+  const onToggleMouseDown = useCallback(() => {
+    if (searchOpen) scrollYOnCloseRef.current = window.scrollY;
+  }, [searchOpen]);
+
+  useLayoutEffect(() => {
+    if (searchOpen || scrollYOnCloseRef.current == null) return;
+    const y = scrollYOnCloseRef.current;
+    scrollYOnCloseRef.current = null;
+    requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+      requestAnimationFrame(() => {
+        window.scrollTo(0, y);
+        searchToggleRef.current?.focus({ preventScroll: true });
+      });
+    });
+  }, [searchOpen]);
+
   return (
     <section className={`search-panel ${searchOpen ? 'search-panel-open' : ''}`}>
       <button
+        ref={searchToggleRef}
         type="button"
         className="search-panel-toggle"
-        onClick={() => setSearchOpen((o) => !o)}
+        onMouseDown={onToggleMouseDown}
+        onClick={toggleSearchOpen}
         aria-expanded={searchOpen}
       >
         {searchOpen ? '▼ Close search' : '▶ Search products'}

@@ -591,7 +591,10 @@ function TableContent({ token }: { token: string | null }) {
                       onMouseDown={(e) => handleTableRowMouseDown(e, index)}
                       onMouseEnter={() => handleTableRowMouseEnter(index)}
                     >
-                      <td className="cell-wrap">
+                      <td
+                        className="table-col-product"
+                        title={item.product?.product_name || item.product_url}
+                      >
                         {obscureProductDisplayName(item.product?.product_name, item.product_url)}
                       </td>
                       <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>

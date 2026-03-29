@@ -65,9 +65,10 @@ function ymdToUtc(ymd: string): number {
   return Date.UTC(y, m - 1, d);
 }
 
-export function priceClosestByYmd(history: PricePoint[], targetYmd: string): number | null {
+/** Closest history row to `targetYmd` by calendar distance (ignores rows with no `price`). */
+export function pricePointClosestByYmd(history: PricePoint[], targetYmd: string): PricePoint | null {
   const t = ymdToUtc(targetYmd);
-  let best: number | null = null;
+  let best: PricePoint | null = null;
   let bestDist = Infinity;
   let bestKey = '';
   for (const pt of history) {
@@ -76,11 +77,16 @@ export function priceClosestByYmd(history: PricePoint[], targetYmd: string): num
     const dist = Math.abs(ymdToUtc(key) - t);
     if (dist < bestDist || (dist === bestDist && key < bestKey)) {
       bestDist = dist;
-      best = pt.price;
+      best = pt;
       bestKey = key;
     }
   }
   return best;
+}
+
+export function priceClosestByYmd(history: PricePoint[], targetYmd: string): number | null {
+  const p = pricePointClosestByYmd(history, targetYmd);
+  return p?.price ?? null;
 }
 
 /** Whole-euro amounts show two decimals (e.g. 12 → 12.00); others stay compact after cent rounding. */

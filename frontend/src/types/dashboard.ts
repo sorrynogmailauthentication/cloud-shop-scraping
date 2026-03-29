@@ -29,6 +29,8 @@ export interface UserList {
 export interface UserListItem {
   id: number;
   list_id: string;
+  /** Set when loaded from API; omitted on optimistic rows from search. */
+  product_id?: string;
   product_url: string;
   position: number;
   created_at: string;

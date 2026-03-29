@@ -92,12 +92,12 @@ export async function searchProducts(params: {
     : 'ORDER BY p.product_name ASC NULLS LAST';
   const sql = `
     WITH latest AS (
-      SELECT DISTINCT ON (product_url) product_url, date, price, discount
-      FROM prices
-      ORDER BY product_url, date DESC
+      SELECT DISTINCT ON (pr.product_id) pr.product_id, pr.date, pr.price, pr.discount
+      FROM prices pr
+      ORDER BY pr.product_id, pr.date DESC
     ),
     parsed AS (
-      SELECT product_url, price,
+      SELECT product_id, price,
              NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
       FROM latest
     )
@@ -116,7 +116,7 @@ export async function searchProducts(params: {
         ELSE NULL
       END AS discount_pct
     FROM products p
-    LEFT JOIN parsed par ON par.product_url = p.url
+    LEFT JOIN parsed par ON par.product_id = p.product_id
     WHERE ${conditions.join(' AND ')}
     ${orderBy}
     LIMIT $${limitParam} OFFSET $${offsetParam}
@@ -156,7 +156,7 @@ export async function getShopCategoryPairs(): Promise<ShopCategoryPair[]> {
   return (res.rows as { shop: string; category: string }[]).map((r) => ({ shop: r.shop, category: r.category }));
 }
 
-/** Price history for one product in date range. */
+/** Price history for one product (by canonical URL) in date range. */
 export async function getPriceHistory(
   productUrl: string,
   fromDate: string,
@@ -165,10 +165,11 @@ export async function getPriceHistory(
   const p = getPool();
   const res = await p.query(
     `WITH parsed AS (
-       SELECT date, price,
-              NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
-       FROM prices
-       WHERE product_url = $1 AND date >= $2 AND date <= $3
+       SELECT pr.date, pr.price,
+              NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(pr.discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
+       FROM prices pr
+       INNER JOIN products p ON p.product_id = pr.product_id AND p.url = $1
+       WHERE pr.date >= $2 AND pr.date <= $3
      )
      SELECT date::text, price, price_before_discount,
        CASE

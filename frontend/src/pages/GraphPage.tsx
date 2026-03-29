@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LineChart,
   Line,
@@ -10,7 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import type { UserListItem } from '../types/dashboard';
+import type { PricePoint, UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
@@ -22,6 +23,8 @@ import {
   expandPriceFetchWindow,
   formatYmdDisplay,
   priceClosestByYmd,
+  pricePointClosestByYmd,
+  formatPriceDisplay,
   timelineIdxToYmd,
   timelineMaxIdx,
 } from '../utils/priceHistory';
@@ -30,6 +33,65 @@ import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+type GraphPointTip = {
+  date: string;
+  name: string;
+  value: number;
+  color: string;
+  left: number;
+  top: number;
+};
+
+/** Recharts 3 LineChart only supports axis tooltips; item hover is done via custom dots. */
+function lineDotRenderer(
+  seriesName: string,
+  strokeColor: string,
+  setTip: (t: GraphPointTip | null) => void
+) {
+  return function GraphLineDot(dotProps: {
+    cx?: number;
+    cy?: number;
+    payload?: { date?: string };
+    value?: number | string | null;
+  }) {
+    const { cx, cy, payload, value } = dotProps;
+    if (cx == null || cy == null || value == null || value === '') return null;
+    const v = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(v)) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={6}
+        fill={strokeColor}
+        stroke="var(--surface)"
+        strokeWidth={1}
+        className="graph-line-dot-hit"
+        onMouseEnter={(e) => {
+          e.stopPropagation();
+          setTip({
+            date: String(payload?.date ?? ''),
+            name: seriesName,
+            value: v,
+            color: strokeColor,
+            left: e.clientX,
+            top: e.clientY,
+          });
+        }}
+        onMouseMove={(e) => {
+          e.stopPropagation();
+          setTip((prev) =>
+            prev
+              ? { ...prev, left: e.clientX, top: e.clientY }
+              : null
+          );
+        }}
+        onMouseLeave={() => setTip(null)}
+      />
+    );
+  };
 }
 
 export default function GraphPage() {
@@ -107,8 +169,11 @@ function GraphContent({ token }: { token: string | null }) {
   const toDateLabel = useMemo(() => formatYmdDisplay(toYmd), [toYmd]);
 
   const [chartData, setChartData] = useState<{ date: string; [key: string]: string | number | null }[]>([]);
+  const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState('');
+  const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
+  const [snapshotYmd, setSnapshotYmd] = useState<string | null>(null);
 
   const chartItemsKey = useMemo(
     () => displayItems.map((i) => i.product_url).join('\0'),
@@ -128,6 +193,7 @@ function GraphContent({ token }: { token: string | null }) {
   useEffect(() => {
     if (!token || displayItems.length === 0) {
       setChartData([]);
+      setHistByUrl(new Map());
       setChartError('');
       setChartLoading(false);
       return;
@@ -146,6 +212,7 @@ function GraphContent({ token }: { token: string | null }) {
       .then(({ results }) => {
         if (cancelled) return;
         const byUrl = new Map(results.map((r) => [r.product_url, r.history]));
+        setHistByUrl(byUrl);
         const byDate = new Map<string, Record<string, string | number | null>>();
 
         const ensureRow = (d: string) => {
@@ -190,6 +257,7 @@ function GraphContent({ token }: { token: string | null }) {
       .catch((e) => {
         if (!cancelled) {
           setChartData([]);
+          setHistByUrl(new Map());
           setChartError(e instanceof Error ? e.message : 'Failed to load chart');
         }
       })
@@ -201,8 +269,48 @@ function GraphContent({ token }: { token: string | null }) {
     };
   }, [token, chartItemsKey, fromYmd, toYmd]);
 
+  useEffect(() => {
+    setPointTip(null);
+  }, [chartItemsKey, fromYmd, toYmd, chartData.length]);
+
+  useEffect(() => {
+    setSnapshotYmd((prev) => {
+      if (prev == null || prev < fromYmd || prev > toYmd) return toYmd;
+      return prev;
+    });
+  }, [fromYmd, toYmd]);
+
+  const snapshotRows = useMemo(() => {
+    const day = snapshotYmd ?? toYmd;
+    if (!day || displayItems.length === 0) return [];
+    return displayItems.map((item, i) => {
+      const hist = histByUrl.get(item.product_url) ?? [];
+      const pt = pricePointClosestByYmd(hist, day);
+      return {
+        item,
+        i,
+        price: pt?.price ?? null,
+        priceBeforeDiscount: pt?.price_before_discount ?? null,
+        discountPct: pt?.discount_pct ?? null,
+        color: CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length],
+      };
+    });
+  }, [snapshotYmd, toYmd, displayItems, histByUrl]);
+
   const lineLabel = (item: UserListItem) =>
     obscureProductDisplayName(item.product?.product_name, item.product_url);
+
+  const lineDotFns = useMemo(
+    () =>
+      displayItems.map((item, i) =>
+        lineDotRenderer(
+          obscureProductDisplayName(item.product?.product_name, item.product_url),
+          CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length],
+          setPointTip
+        )
+      ),
+    [displayItems]
+  );
 
   return (
     <div className="table-page-layout graph-page-layout">
@@ -299,29 +407,79 @@ function GraphContent({ token }: { token: string | null }) {
           />
         )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && (
-          <div className="graph-selected-toolbar">
-            <div className="chart-products">
-              {displayItems.map((item, i) => (
-                <span
-                  key={item.product_url}
-                  className="chart-tag"
-                  style={{ borderColor: CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length] }}
-                >
-                  <span className="cell-wrap">
-                    {obscureProductDisplayName(item.product?.product_name, item.product_url)}
-                  </span>
-                  <button
-                    type="button"
-                    className="chart-tag-remove"
-                    onClick={() => removeFromList(item.product_url)}
-                    title="Remove from list"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
+        {listWithItems && !listLoading && displayItems.length > 0 && !chartLoading && (
+          <div className="graph-snapshot-panel">
+            <div className="graph-snapshot-panel-head">
+              <label className="graph-snapshot-date-field">
+                <span className="graph-snapshot-label">Prices on</span>
+                <input
+                  type="date"
+                  className="graph-snapshot-date-input"
+                  min={fromYmd}
+                  max={toYmd}
+                  value={snapshotYmd ?? toYmd}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v >= fromYmd && v <= toYmd) setSnapshotYmd(v);
+                  }}
+                  aria-label="Date for price list"
+                />
+              </label>
+              <span className="graph-snapshot-date-hint muted">
+                {formatYmdDisplay(snapshotYmd ?? toYmd)}
+              </span>
             </div>
+            {chartError ? (
+              <p className="widget-error graph-snapshot-error">{chartError}</p>
+            ) : (
+              <>
+                <div className="graph-snapshot-list-head" aria-hidden>
+                  <span className="graph-snapshot-col-name">Product</span>
+                  <span className="graph-snapshot-col-num">Price</span>
+                  <span className="graph-snapshot-col-num">Before discount</span>
+                  <span className="graph-snapshot-col-pct">%</span>
+                  <span className="graph-snapshot-col-remove" />
+                </div>
+                <ul className="graph-snapshot-list" aria-label="Product prices for selected date">
+                  {snapshotRows.map(
+                    ({ item, price, priceBeforeDiscount, discountPct, color }) => (
+                      <li
+                        key={item.product_url}
+                        className="graph-snapshot-row"
+                        style={{ borderLeftColor: color }}
+                      >
+                        <span className="graph-snapshot-name" title={item.product?.product_name || item.product_url}>
+                          {item.product?.product_name || item.product_url}
+                        </span>
+                        <span className="graph-snapshot-price">
+                          {price != null ? formatPriceDisplay(price) : '—'}
+                        </span>
+                        <span className="graph-snapshot-before">
+                          {priceBeforeDiscount != null ? formatPriceDisplay(priceBeforeDiscount) : '—'}
+                        </span>
+                        <span className="graph-snapshot-pct">
+                          {discountPct != null ? `${discountPct}%` : '—'}
+                        </span>
+                        <span className="graph-snapshot-remove">
+                          <button
+                            type="button"
+                            className="btn-remove"
+                            onClick={() => removeFromList(item.product_url)}
+                            title="Remove from list"
+                            aria-label="Remove from list"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </>
+            )}
+            <p className="graph-snapshot-footnote muted">
+              When no price exists for that exact day, the closest available price in history is shown (same as the chart).
+            </p>
           </div>
         )}
 
@@ -332,10 +490,7 @@ function GraphContent({ token }: { token: string | null }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
                 <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
-                  labelStyle={{ color: 'var(--text)' }}
-                />
+                <Tooltip active={false} cursor={false} />
                 <Legend />
                 {displayItems.map((item, i) => (
                   <Line
@@ -346,7 +501,7 @@ function GraphContent({ token }: { token: string | null }) {
                     stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]}
                     strokeDasharray={chartSeriesStrokeDash(i)}
                     strokeWidth={2}
-                    dot={{ r: 3 }}
+                    dot={lineDotFns[i]}
                     connectNulls
                   />
                 ))}
@@ -363,6 +518,26 @@ function GraphContent({ token }: { token: string | null }) {
           <p className="widget-hint">Search and add products, then adjust the date range. Save to persist the list.</p>
         )}
       </section>
+
+      {pointTip &&
+        createPortal(
+          <div
+            className="graph-point-tooltip"
+            style={{
+              position: 'fixed',
+              left: pointTip.left + 14,
+              top: pointTip.top + 14,
+              zIndex: 10050,
+            }}
+          >
+            <div className="graph-point-tooltip-date">{formatYmdDisplay(pointTip.date)}</div>
+            <div className="graph-point-tooltip-name" style={{ color: pointTip.color }}>
+              {pointTip.name}
+            </div>
+            <div className="graph-point-tooltip-price">{formatPriceDisplay(pointTip.value)}</div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

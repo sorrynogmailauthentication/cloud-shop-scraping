@@ -23,6 +23,7 @@ export interface UserList {
 export interface UserListItem {
   id: number;
   list_id: string;
+  product_id: string;
   product_url: string;
   position: number;
   created_at: string;
@@ -122,8 +123,9 @@ export async function deleteList(listId: string, userId: string): Promise<boolea
 
 export async function getListItems(listId: string, userId: string): Promise<UserListItem[]> {
   const res = await getPool().query(
-    `SELECT li.id, li.list_id, li.product_url, li.position, li.created_at
+    `SELECT li.id, li.list_id, li.product_id, li.position, li.created_at, p.url AS product_url
      FROM user_list_items li
+     JOIN products p ON p.product_id = li.product_id
      JOIN user_lists l ON l.id = li.list_id AND l.user_id = $2
      WHERE li.list_id = $1
      ORDER BY li.position, li.created_at`,
@@ -132,6 +134,7 @@ export async function getListItems(listId: string, userId: string): Promise<User
   return res.rows.map((r: Record<string, unknown>) => ({
     id: Number(r.id),
     list_id: String(r.list_id),
+    product_id: String(r.product_id),
     product_url: String(r.product_url),
     position: Number(r.position),
     created_at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
@@ -147,7 +150,7 @@ export async function getListWithItems(listId: string, userId: string): Promise<
     items.map(async (item) => {
       const pr = await pool.query(
         `WITH latest AS (
-          SELECT price, discount FROM prices WHERE product_url = $1 ORDER BY date DESC LIMIT 1
+          SELECT price, discount FROM prices WHERE product_id = $1::uuid ORDER BY date DESC LIMIT 1
         ),
         parsed AS (
           SELECT price,
@@ -164,8 +167,8 @@ export async function getListWithItems(listId: string, userId: string): Promise<
                END AS discount_pct
         FROM products p
         LEFT JOIN parsed par ON true
-        WHERE p.url = $1`,
-        [item.product_url]
+        WHERE p.product_id = $1::uuid`,
+        [item.product_id]
       );
       const row = pr.rows[0] as Record<string, unknown> | undefined;
       const product: ProductWithPrice | undefined = row
@@ -194,8 +197,9 @@ export async function addListItem(
   const list = await getListById(listId, userId);
   if (!list) return { added: false, error: 'List not found' };
   const pool = getPool();
-  const productExists = await pool.query('SELECT 1 FROM products WHERE url = $1', [productUrl]);
-  if (productExists.rows.length === 0) return { added: false, error: 'Product not found' };
+  const productRow = await pool.query('SELECT product_id FROM products WHERE url = $1', [productUrl]);
+  if (productRow.rows.length === 0) return { added: false, error: 'Product not found' };
+  const productId = String((productRow.rows[0] as { product_id: string }).product_id);
   const maxPos = await pool.query(
     'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM user_list_items WHERE list_id = $1',
     [listId]
@@ -203,8 +207,8 @@ export async function addListItem(
   const nextPos = Number((maxPos.rows[0] as { next: number }).next);
   try {
     await pool.query(
-      'INSERT INTO user_list_items (list_id, product_url, position) VALUES ($1, $2, $3)',
-      [listId, productUrl, nextPos]
+      'INSERT INTO user_list_items (list_id, product_id, position) VALUES ($1, $2::uuid, $3)',
+      [listId, productId, nextPos]
     );
     return { added: true };
   } catch (e: unknown) {
@@ -219,11 +223,15 @@ export async function removeListItem(
   userId: string,
   productUrl: string
 ): Promise<boolean> {
-  const res = await getPool().query(
+  const pool = getPool();
+  const pid = await pool.query('SELECT product_id FROM products WHERE url = $1', [productUrl]);
+  if (pid.rows.length === 0) return false;
+  const productId = String((pid.rows[0] as { product_id: string }).product_id);
+  const res = await pool.query(
     `DELETE FROM user_list_items
-     WHERE list_id = $1 AND product_url = $2
+     WHERE list_id = $1 AND product_id = $2::uuid
      AND EXISTS (SELECT 1 FROM user_lists WHERE id = $1 AND user_id = $3)`,
-    [listId, productUrl, userId]
+    [listId, productId, userId]
   );
   return (res.rowCount ?? 0) > 0;
 }

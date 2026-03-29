@@ -5,6 +5,7 @@ import type { UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import type { PricePoint } from '../types/dashboard';
 import {
@@ -147,7 +148,9 @@ function TableContent({ token }: { token: string | null }) {
     handleClearTable: clearListRows,
     addOneToList,
     handleAddAllFromSearch,
-  } = useUserListEditor(token);
+  } = useUserListEditor(token, { listKind: 'table' });
+
+  useKeepScrollOnListSwitch(currentListId, listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() =>

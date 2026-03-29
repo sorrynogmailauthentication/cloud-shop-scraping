@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ListWithItems, UserList, UserListItem } from '../types/dashboard';
+import type { ListWithItems, UserList, UserListItem, UserListKind } from '../types/dashboard';
 import type { ProductWithPrice } from '../types/dashboard';
 import {
   fetchMyLists,
@@ -21,7 +21,15 @@ export function rowFromSearchProduct(p: ProductWithPrice, listId: string, seq: n
   };
 }
 
-export function useUserListEditor(token: string | null) {
+export type UserListEditorOptions = {
+  /** Table page vs graph page — separate saved lists in the API. */
+  listKind: UserListKind;
+};
+
+export function useUserListEditor(token: string | null, options: UserListEditorOptions) {
+  const { listKind } = options;
+  const defaultListName = listKind === 'graph' ? 'My graph' : 'My table';
+
   const [lists, setLists] = useState<UserList[]>([]);
   const [currentListId, setCurrentListId] = useState<string | null>(null);
   const [listWithItems, setListWithItems] = useState<ListWithItems | null>(null);
@@ -34,13 +42,13 @@ export function useUserListEditor(token: string | null) {
   const loadLists = useCallback(async () => {
     if (!token) return;
     try {
-      let { lists: L } = await fetchMyLists(token);
+      let { lists: L } = await fetchMyLists(token, listKind);
       if (L.length === 0) {
         try {
-          const { list } = await createList(token, 'My table', null);
+          const { list } = await createList(token, defaultListName, null, listKind);
           L = [list];
         } catch {
-          const { lists: again } = await fetchMyLists(token);
+          const { lists: again } = await fetchMyLists(token, listKind);
           L = again;
         }
       }
@@ -54,7 +62,7 @@ export function useUserListEditor(token: string | null) {
       setLists([]);
       setCurrentListId(null);
     }
-  }, [token]);
+  }, [token, listKind, defaultListName]);
 
   const loadListWithItems = useCallback(
     async (options?: { silent?: boolean; forListId?: string | null }) => {
@@ -165,10 +173,10 @@ export function useUserListEditor(token: string | null) {
           }
         }
         setCurrentListId(existing.id);
-        const { lists: L } = await fetchMyLists(token);
+        const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
       } else {
-        const { list: created } = await createList(token, name, null);
+        const { list: created } = await createList(token, name, null, listKind);
         for (const url of urls) {
           try {
             await addProductToList(token, created.id, url);
@@ -177,7 +185,7 @@ export function useUserListEditor(token: string | null) {
           }
         }
         setCurrentListId(created.id);
-        const { lists: L } = await fetchMyLists(token);
+        const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
       }
     } catch (e) {
@@ -189,20 +197,20 @@ export function useUserListEditor(token: string | null) {
 
   const handleDeleteTable = async () => {
     if (!token || !currentListId) return;
-    const label = lists.find((l) => l.id === currentListId)?.name ?? 'this table';
+    const label = lists.find((l) => l.id === currentListId)?.name ?? 'this list';
     if (!window.confirm(`Delete “${label}”?`)) return;
     setTableToolsBusy(true);
     setPendingItems(null);
     try {
       const id = currentListId;
       await deleteListApi(token, id);
-      let { lists: L } = await fetchMyLists(token);
+      let { lists: L } = await fetchMyLists(token, listKind);
       if (L.length === 0) {
         try {
-          const { list } = await createList(token, 'My table', null);
+          const { list } = await createList(token, defaultListName, null, listKind);
           L = [list];
         } catch {
-          const { lists: again } = await fetchMyLists(token);
+          const { lists: again } = await fetchMyLists(token, listKind);
           L = again;
         }
       }

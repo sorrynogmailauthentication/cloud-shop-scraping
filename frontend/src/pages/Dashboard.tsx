@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -20,8 +20,10 @@ import {
   addProductToList,
   removeProductFromList,
 } from '../api/dashboard';
+import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { formatPriceDisplay } from '../utils/priceHistory';
 import { obscureProductDisplayName } from '../utils/productDisplay';
+import { priceChartYDomain, Y_AXIS_TICK_COUNT, YAxisTickHideTopLabel } from '../utils/chartAxis';
 import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors';
 
 function todayStr(): string {
@@ -103,10 +105,12 @@ function DashboardContent({ token }: { token: string | null }) {
   const [chartData, setChartData] = useState<{ date: string; [key: string]: string | number | null }[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
 
+  useKeepScrollOnListSwitch(currentListId, listLoading);
+
   const loadLists = useCallback(async () => {
     if (!token) return;
     try {
-      const { lists: L } = await fetchMyLists(token);
+      const { lists: L } = await fetchMyLists(token, 'table');
       setLists(L);
       if (L.length > 0 && !currentListId) setCurrentListId(L[0].id);
       else if (L.length === 0) setCurrentListId(null);
@@ -143,7 +147,7 @@ function DashboardContent({ token }: { token: string | null }) {
   const ensureDefaultList = useCallback(async () => {
     if (!token || lists.length > 0) return lists[0]?.id ?? null;
     try {
-      const { list } = await createList(token, 'My table', null);
+      const { list } = await createList(token, 'My table', null, 'table');
       setLists((prev) => [...prev, list]);
       setCurrentListId(list.id);
       return list.id;
@@ -266,6 +270,11 @@ function DashboardContent({ token }: { token: string | null }) {
       .catch(() => setChartData([]))
       .finally(() => setChartLoading(false));
   }, [token, chartProducts, chartRange]);
+
+  const chartYDomain = useMemo(
+    () => priceChartYDomain(chartData, chartProducts.length),
+    [chartData, chartProducts.length]
+  );
 
   return (
     <div className="dashboard-grid">
@@ -456,11 +465,17 @@ function DashboardContent({ token }: { token: string | null }) {
         {chartLoading && <p className="muted">Loading chart…</p>}
         {chartData.length > 0 && !chartLoading && (
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width="100%" height={640}>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                <YAxis
+                  stroke="var(--muted)"
+                  tick={YAxisTickHideTopLabel}
+                  domain={chartYDomain}
+                  tickCount={Y_AXIS_TICK_COUNT}
+                  interval={0}
+                />
                 <Tooltip
                   contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
                   labelStyle={{ color: 'var(--text)' }}

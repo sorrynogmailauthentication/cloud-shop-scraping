@@ -10,11 +10,15 @@ function priceToNum(val: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Saved list role: table page vs graph page (separate named lists per user). */
+export type UserListKind = 'table' | 'graph';
+
 export interface UserList {
   id: string;
   user_id: string;
   name: string;
   description: string | null;
+  kind: UserListKind;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -34,28 +38,39 @@ export interface ListWithItems extends UserList {
 }
 
 function rowToList(row: Record<string, unknown>): UserList {
+  const k = row.kind != null ? String(row.kind) : 'table';
+  const kind: UserListKind = k === 'graph' ? 'graph' : 'table';
   return {
     id: String(row.id),
     user_id: String(row.user_id),
     name: String(row.name),
     description: row.description != null ? String(row.description) : null,
+    kind,
     sort_order: Number(row.sort_order),
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   };
 }
 
-export async function getListsByUserId(userId: string): Promise<UserList[]> {
-  const res = await getPool().query(
-    'SELECT id, user_id, name, description, sort_order, created_at, updated_at FROM user_lists WHERE user_id = $1 ORDER BY sort_order, created_at',
-    [userId]
-  );
+export async function getListsByUserId(userId: string, kind?: UserListKind): Promise<UserList[]> {
+  const res =
+    kind != null
+      ? await getPool().query(
+          `SELECT id, user_id, name, description, kind, sort_order, created_at, updated_at
+           FROM user_lists WHERE user_id = $1 AND kind = $2 ORDER BY sort_order, created_at`,
+          [userId, kind]
+        )
+      : await getPool().query(
+          `SELECT id, user_id, name, description, kind, sort_order, created_at, updated_at
+           FROM user_lists WHERE user_id = $1 ORDER BY sort_order, created_at`,
+          [userId]
+        );
   return res.rows.map((r: Record<string, unknown>) => rowToList(r));
 }
 
 export async function getListById(listId: string, userId: string): Promise<UserList | null> {
   const res = await getPool().query(
-    'SELECT id, user_id, name, description, sort_order, created_at, updated_at FROM user_lists WHERE id = $1 AND user_id = $2',
+    'SELECT id, user_id, name, description, kind, sort_order, created_at, updated_at FROM user_lists WHERE id = $1 AND user_id = $2',
     [listId, userId]
   );
   if (res.rows.length === 0) return null;
@@ -65,20 +80,21 @@ export async function getListById(listId: string, userId: string): Promise<UserL
 export async function createList(
   userId: string,
   name: string,
-  description?: string | null
+  description: string | null | undefined,
+  listKind: UserListKind
 ): Promise<UserList> {
   const trimmed = name.trim();
   const pool = getPool();
   const nextOrder = await pool.query(
-    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM user_lists WHERE user_id = $1',
-    [userId]
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM user_lists WHERE user_id = $1 AND kind = $2',
+    [userId, listKind]
   );
   const sortOrder = Number((nextOrder.rows[0] as { next_order: number }).next_order);
   const res = await pool.query(
-    `INSERT INTO user_lists (user_id, name, description, sort_order)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, user_id, name, description, sort_order, created_at, updated_at`,
-    [userId, trimmed, description ?? null, sortOrder]
+    `INSERT INTO user_lists (user_id, name, description, kind, sort_order)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, user_id, name, description, kind, sort_order, created_at, updated_at`,
+    [userId, trimmed, description ?? null, listKind, sortOrder]
   );
   return rowToList(res.rows[0]);
 }
@@ -106,7 +122,7 @@ export async function updateList(
   values.push(listId, userId);
   const res = await getPool().query(
     `UPDATE user_lists SET ${setClauses.join(', ')} WHERE id = $${i} AND user_id = $${i + 1}
-     RETURNING id, user_id, name, description, sort_order, created_at, updated_at`,
+     RETURNING id, user_id, name, description, kind, sort_order, created_at, updated_at`,
     values
   );
   if (res.rows.length === 0) return null;

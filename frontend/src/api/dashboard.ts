@@ -114,9 +114,11 @@ export async function fetchPriceHistoryBatched(
 }
 
 export async function fetchMyLists(
-  token: string | null
+  token: string | null,
+  kind?: import('../types/dashboard').UserListKind
 ): Promise<{ lists: import('../types/dashboard').UserList[] }> {
-  const res = await fetch(`${API_BASE}/api/me/lists`, {
+  const q = kind ? `?kind=${encodeURIComponent(kind)}` : '';
+  const res = await fetch(`${API_BASE}/api/me/lists${q}`, {
     headers: authHeaders(token),
     credentials: 'include',
   });
@@ -139,13 +141,14 @@ export async function fetchListWithItems(
 export async function createList(
   token: string | null,
   name: string,
-  description?: string | null
+  description?: string | null,
+  kind: import('../types/dashboard').UserListKind = 'table'
 ): Promise<{ list: import('../types/dashboard').UserList }> {
   const res = await fetch(`${API_BASE}/api/me/lists`, {
     method: 'POST',
     headers: authHeaders(token),
     credentials: 'include',
-    body: JSON.stringify({ name, description: description ?? null }),
+    body: JSON.stringify({ name, description: description ?? null, kind }),
   });
   if (!res.ok) throw new Error(await readApiErrorBody(res));
   return res.json();

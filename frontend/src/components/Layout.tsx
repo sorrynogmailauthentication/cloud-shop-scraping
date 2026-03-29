@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,6 +10,24 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isDashboard = location.pathname === '/' || location.pathname === '/graph';
+  const scrollByPath = useRef<Record<string, number>>({});
+
+  useLayoutEffect(() => {
+    const y = scrollByPath.current[location.pathname];
+    if (y != null) window.scrollTo(0, y);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const onScroll = () => {
+      scrollByPath.current[path] = window.scrollY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      scrollByPath.current[path] = window.scrollY;
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, [location.pathname]);
 
   const hasAccess =
     user?.isPaid &&

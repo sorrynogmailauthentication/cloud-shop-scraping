@@ -15,6 +15,7 @@ import type { PricePoint, UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import {
   TABLE_DATE_ANCHOR_YMD,
@@ -29,6 +30,7 @@ import {
   timelineMaxIdx,
 } from '../utils/priceHistory';
 import { obscureProductDisplayName } from '../utils/productDisplay';
+import { priceChartYDomain, Y_AXIS_TICK_COUNT, YAxisTickHideTopLabel } from '../utils/chartAxis';
 import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors';
 
 function todayStr(): string {
@@ -43,6 +45,29 @@ type GraphPointTip = {
   left: number;
   top: number;
 };
+
+/** Matches `.graph-point-tooltip` max-width and typical height (long names may wrap). */
+const TOOLTIP_EST_W = 280;
+const TOOLTIP_EST_H = 120;
+const TOOLTIP_OFFSET = 14;
+const VIEW_MARGIN = 8;
+
+function clampTooltipViewport(clientX: number, clientY: number): { left: number; top: number } {
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 800;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 600;
+  const W = Math.min(TOOLTIP_EST_W, vw - 2 * VIEW_MARGIN);
+  const H = TOOLTIP_EST_H;
+
+  let left = Math.min(clientX + TOOLTIP_OFFSET, vw - W - VIEW_MARGIN);
+  left = Math.max(VIEW_MARGIN, left);
+
+  let top = clientY + TOOLTIP_OFFSET;
+  if (top + H > vh - VIEW_MARGIN) {
+    top = clientY - H - TOOLTIP_OFFSET;
+  }
+  top = Math.max(VIEW_MARGIN, Math.min(top, vh - H - VIEW_MARGIN));
+  return { left, top };
+}
 
 /** Recharts 3 LineChart only supports axis tooltips; item hover is done via custom dots. */
 function lineDotRenderer(
@@ -60,36 +85,48 @@ function lineDotRenderer(
     if (cx == null || cy == null || value == null || value === '') return null;
     const v = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(v)) return null;
+
+    const showAt = (e: { clientX: number; clientY: number }) => {
+      const { left, top } = clampTooltipViewport(e.clientX, e.clientY);
+      setTip({
+        date: String(payload?.date ?? ''),
+        name: seriesName,
+        value: v,
+        color: strokeColor,
+        left,
+        top,
+      });
+    };
+
     return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={6}
-        fill={strokeColor}
-        stroke="var(--surface)"
-        strokeWidth={1}
-        className="graph-line-dot-hit"
-        onMouseEnter={(e) => {
-          e.stopPropagation();
-          setTip({
-            date: String(payload?.date ?? ''),
-            name: seriesName,
-            value: v,
-            color: strokeColor,
-            left: e.clientX,
-            top: e.clientY,
-          });
-        }}
-        onMouseMove={(e) => {
-          e.stopPropagation();
-          setTip((prev) =>
-            prev
-              ? { ...prev, left: e.clientX, top: e.clientY }
-              : null
-          );
-        }}
-        onMouseLeave={() => setTip(null)}
-      />
+      <g className="graph-line-dot-group">
+        <circle
+          cx={cx}
+          cy={cy}
+          r={18}
+          fill="transparent"
+          stroke="none"
+          style={{ cursor: 'pointer' }}
+          onMouseEnter={(e) => {
+            e.stopPropagation();
+            showAt(e);
+          }}
+          onMouseMove={(e) => {
+            e.stopPropagation();
+            showAt(e);
+          }}
+          onMouseLeave={() => setTip(null)}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={6}
+          fill={strokeColor}
+          stroke="var(--surface)"
+          strokeWidth={1}
+          pointerEvents="none"
+        />
+      </g>
     );
   };
 }
@@ -146,7 +183,9 @@ function GraphContent({ token }: { token: string | null }) {
     handleClearTable: clearListRows,
     addOneToList,
     handleAddAllFromSearch,
-  } = useUserListEditor(token);
+  } = useUserListEditor(token, { listKind: 'graph' });
+
+  useKeepScrollOnListSwitch(currentListId, listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() =>
@@ -312,6 +351,11 @@ function GraphContent({ token }: { token: string | null }) {
     [displayItems]
   );
 
+  const chartYDomain = useMemo(
+    () => priceChartYDomain(chartData, displayItems.length),
+    [chartData, displayItems.length]
+  );
+
   return (
     <div className="table-page-layout graph-page-layout">
       <ProductSearchPanel
@@ -329,7 +373,7 @@ function GraphContent({ token }: { token: string | null }) {
         <div className="table-toolbar-wrap">
           <div className="table-toolbar">
             <label className="table-toolbar-field">
-              <span className="table-toolbar-label">Table</span>
+              <span className="table-toolbar-label">Graph</span>
               <select
                 className="list-select table-toolbar-select"
                 value={currentListId ?? ''}
@@ -337,7 +381,7 @@ function GraphContent({ token }: { token: string | null }) {
                 disabled={lists.length === 0 || tableToolsBusy}
               >
                 {lists.length === 0 ? (
-                  <option value="">No tables</option>
+                  <option value="">No saved graphs</option>
                 ) : (
                   lists.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -389,7 +433,7 @@ function GraphContent({ token }: { token: string | null }) {
           <p className="widget-hint">Unsaved row changes — click Save to write them to the server.</p>
         )}
         {!currentListId && lists.length === 0 && (
-          <p className="widget-hint muted">Loading your table…</p>
+          <p className="widget-hint muted">Loading your graph…</p>
         )}
         {listLoading && <p className="muted">Loading…</p>}
 
@@ -435,6 +479,7 @@ function GraphContent({ token }: { token: string | null }) {
               <>
                 <div className="graph-snapshot-list-head" aria-hidden>
                   <span className="graph-snapshot-col-name">Product</span>
+                  <span className="graph-snapshot-col-shop">Shop</span>
                   <span className="graph-snapshot-col-num">Price</span>
                   <span className="graph-snapshot-col-num">Before discount</span>
                   <span className="graph-snapshot-col-pct">%</span>
@@ -450,6 +495,12 @@ function GraphContent({ token }: { token: string | null }) {
                       >
                         <span className="graph-snapshot-name" title={item.product?.product_name || item.product_url}>
                           {item.product?.product_name || item.product_url}
+                        </span>
+                        <span
+                          className="graph-snapshot-shop"
+                          title={item.product?.shop ?? ''}
+                        >
+                          {item.product?.shop ?? '—'}
                         </span>
                         <span className="graph-snapshot-price">
                           {price != null ? formatPriceDisplay(price) : '—'}
@@ -485,11 +536,17 @@ function GraphContent({ token }: { token: string | null }) {
 
         {listWithItems && !listLoading && displayItems.length > 0 && chartData.length > 0 && !chartLoading && (
           <div className="chart-container table-wrap">
-            <ResponsiveContainer width="100%" height={360}>
+            <ResponsiveContainer width="100%" height={720}>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                <YAxis
+                  stroke="var(--muted)"
+                  tick={YAxisTickHideTopLabel}
+                  domain={chartYDomain}
+                  tickCount={Y_AXIS_TICK_COUNT}
+                  interval={0}
+                />
                 <Tooltip active={false} cursor={false} />
                 <Legend />
                 {displayItems.map((item, i) => (
@@ -525,8 +582,8 @@ function GraphContent({ token }: { token: string | null }) {
             className="graph-point-tooltip"
             style={{
               position: 'fixed',
-              left: pointTip.left + 14,
-              top: pointTip.top + 14,
+              left: pointTip.left,
+              top: pointTip.top,
               zIndex: 10050,
             }}
           >

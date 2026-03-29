@@ -18,12 +18,6 @@ export function getPool(): pg.Pool {
   return pool;
 }
 
-/** Unique table name per user (case-insensitive, trimmed). Requires `user_lists` to exist. */
-const USER_LISTS_UNIQUE_NAME_INDEX = `
-  CREATE UNIQUE INDEX IF NOT EXISTS user_lists_user_id_name_lower
-  ON user_lists (user_id, (LOWER(TRIM(name))));
-`;
-
 const CREATE_TABLE = `
   CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
@@ -41,16 +35,34 @@ const CREATE_TABLE = `
 export async function initDb(): Promise<void> {
   const p = getPool();
   await p.query(CREATE_TABLE);
+  await migrateUserListsKind(p);
+}
+
+/** Adds list kind (table vs graph), unique name per user per kind. Safe if user_lists is missing. */
+async function migrateUserListsKind(p: pg.Pool): Promise<void> {
+  const exists = await p.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'user_lists'
+    ) AS exists`
+  );
+  if (!exists.rows[0]?.exists) {
+    console.warn('initDb: user_lists missing; skip list kind migration.');
+    return;
+  }
   try {
-    await p.query(USER_LISTS_UNIQUE_NAME_INDEX);
+    await p.query(`
+      ALTER TABLE user_lists
+      ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'table'
+    `);
+    await p.query(`UPDATE user_lists SET kind = 'table' WHERE kind IS NULL OR kind = ''`);
+    await p.query(`DROP INDEX IF EXISTS user_lists_user_id_name_lower`);
+    await p.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS user_lists_user_kind_name_lower
+      ON user_lists (user_id, kind, (LOWER(TRIM(name))))
+    `);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('does not exist') && msg.includes('user_lists')) {
-      console.warn(
-        'initDb: user_lists table missing; skip unique name index. Apply migrations when schema exists.'
-      );
-      return;
-    }
-    throw e;
+    console.warn('initDb: user_lists kind migration:', msg);
   }
 }

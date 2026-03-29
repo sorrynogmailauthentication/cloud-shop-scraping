@@ -10,7 +10,13 @@ import {
   addListItem,
   removeListItem,
   clearListItems,
+  type UserListKind,
 } from '../db/lists.js';
+
+function parseListKind(q: unknown): UserListKind | undefined {
+  if (q === 'table' || q === 'graph') return q;
+  return undefined;
+}
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -24,11 +30,12 @@ function isUniqueViolation(err: unknown): boolean {
 const router = Router();
 router.use(requireAuth);
 
-/** GET /api/me/lists - my lists */
+/** GET /api/me/lists - my lists; optional ?kind=table|graph */
 router.get('/lists', async (req: Request, res: Response) => {
   const userId = req.user!.id;
+  const kind = parseListKind(req.query?.kind);
   try {
-    const lists = await getListsByUserId(userId);
+    const lists = await getListsByUserId(userId, kind);
     res.json({ lists });
   } catch (err) {
     console.error('Get lists error:', err);
@@ -36,21 +43,22 @@ router.get('/lists', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/me/lists - create list */
+/** POST /api/me/lists - create list; body.kind = table | graph (default table) */
 router.post('/lists', async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const description = typeof req.body?.description === 'string' ? req.body.description.trim() : null;
+  const kind: UserListKind = parseListKind(req.body?.kind) ?? 'table';
   if (!name) {
     res.status(400).json({ error: 'name is required' });
     return;
   }
   try {
-    const list = await createList(userId, name, description || undefined);
+    const list = await createList(userId, name, description || undefined, kind);
     res.status(201).json({ list });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      res.status(409).json({ error: 'A table with this name already exists' });
+      res.status(409).json({ error: 'A saved list with this name already exists for this type' });
       return;
     }
     console.error('Create list error:', err);
@@ -91,7 +99,7 @@ router.patch('/lists/:id', async (req: Request, res: Response) => {
     res.json({ list });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      res.status(409).json({ error: 'A table with this name already exists' });
+      res.status(409).json({ error: 'A saved list with this name already exists for this type' });
       return;
     }
     console.error('Update list error:', err);

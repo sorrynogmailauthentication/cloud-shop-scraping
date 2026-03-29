@@ -16,11 +16,15 @@ export interface PricePoint {
   discount_pct: number | null;
 }
 
+/** Whether the list is used on the Table page or Graph page (independent saves per user). */
+export type UserListKind = 'table' | 'graph';
+
 export interface UserList {
   id: string;
   user_id: string;
   name: string;
   description: string | null;
+  kind: UserListKind;
   sort_order: number;
   created_at: string;
   updated_at: string;

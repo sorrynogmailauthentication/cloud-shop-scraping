@@ -491,6 +491,64 @@ function TableContent({ token }: { token: string | null }) {
     setSelectedUrls(new Set());
   };
 
+  const exportTableToCsv = useCallback(() => {
+    if (sortedTableItems.length === 0) return;
+
+    const csvEscape = (value: string): string => {
+      if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+      return value;
+    };
+
+    const headers = [
+      'Товар',
+      'Ссылка',
+      'Магазин',
+      'Категория',
+      `Цена, начало (${fromDateLabel})`,
+      `Цена, конец (${toDateLabel})`,
+      'До скидки',
+      'Скидка %',
+      'Δ цена',
+      'Δ %',
+    ];
+
+    const lines = [
+      csvEscape(`Диапазон дат: ${fromDateLabel} -> ${toDateLabel}`),
+      headers.map(csvEscape).join(','),
+    ];
+
+    for (const item of sortedTableItems) {
+      const h = histByUrl.get(item.product_url) ?? [];
+      const p0 = priceClosestByYmd(h, fromYmd);
+      const p1 = priceClosestByYmd(h, toYmd);
+      const row = [
+        item.product?.product_name || item.product_url,
+        toExternalHref(item.product_url),
+        item.product?.shop ?? '',
+        item.product?.category ?? '',
+        p0 != null ? formatPriceDisplay(p0) : '',
+        p1 != null ? formatPriceDisplay(p1) : '',
+        item.product?.price_before_discount != null ? formatPriceDisplay(item.product.price_before_discount) : '',
+        item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '',
+        formatDeltaPriceOnly(p0, p1) === '—' ? '' : formatDeltaPriceOnly(p0, p1),
+        formatDeltaPctOnly(p0, p1) === '—' ? '' : formatDeltaPctOnly(p0, p1),
+      ];
+      lines.push(row.map((v) => csvEscape(String(v))).join(','));
+    }
+
+    const csv = '\uFEFF' + lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `tsenalitika-table-${dateStamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [sortedTableItems, histByUrl, fromYmd, toYmd, fromDateLabel, toDateLabel]);
+
   return (
     <div className="table-page-layout">
       <ProductSearchPanel
@@ -557,6 +615,15 @@ function TableContent({ token }: { token: string | null }) {
                   Очистить строки
                 </button>
               )}
+              <button
+                type="button"
+                className="btn-add-all table-toolbar-export"
+                disabled={displayItems.length === 0}
+                onClick={exportTableToCsv}
+                title="Скачать текущую таблицу в CSV"
+              >
+                Экспорт CSV
+              </button>
             </div>
           </div>
         </div>

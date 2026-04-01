@@ -34,6 +34,7 @@ export function ProductSearchPanel({
   const [searchUrl, setSearchUrl] = useState('');
   const [searchShops, setSearchShops] = useState<string[]>([]);
   const [searchCategoryPairs, setSearchCategoryPairs] = useState<string[]>([]);
+  const [categoryFilterText, setCategoryFilterText] = useState('');
   const [priceAbove, setPriceAbove] = useState('');
   const [priceBelow, setPriceBelow] = useState('');
   const [shops, setShops] = useState<string[]>([]);
@@ -81,6 +82,14 @@ export function ProductSearchPanel({
     if (searchShops.length === 0) return shopCategoryPairs;
     return shopCategoryPairs.filter((p) => searchShops.includes(p.shop));
   }, [shopCategoryPairs, searchShops]);
+
+  const categoryPairsTypedFiltered = useMemo(() => {
+    const needle = categoryFilterText.trim().toLowerCase();
+    if (!needle) return categoryPairsFiltered;
+    return categoryPairsFiltered.filter((p) =>
+      `${p.shop} ${p.category}`.toLowerCase().includes(needle)
+    );
+  }, [categoryPairsFiltered, categoryFilterText]);
 
   const runSearch = async () => {
     setSearchError('');
@@ -342,6 +351,25 @@ export function ProductSearchPanel({
                 </button>
                 {categoryDropdownOpen && (
                   <div className="search-dropdown-panel search-dropdown-panel--categories">
+                    <div className="search-dropdown-filter-wrap">
+                      <input
+                        type="text"
+                        className="search-dropdown-filter-input"
+                        placeholder="Фильтр категорий"
+                        value={categoryFilterText}
+                        onChange={(e) => setCategoryFilterText(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="search-dropdown-filter-clear"
+                        onClick={() => setCategoryFilterText('')}
+                        disabled={!categoryFilterText.trim()}
+                        aria-label="Очистить фильтр категорий"
+                        title="Очистить фильтр категорий"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     <label className="search-dropdown-option search-dropdown-all">
                       <input
                         type="checkbox"
@@ -350,7 +378,7 @@ export function ProductSearchPanel({
                       />
                       <span>Все категории</span>
                     </label>
-                    {categoryPairsFiltered.map((p) => {
+                    {categoryPairsTypedFiltered.map((p) => {
                       const key = `${p.shop}|${p.category}`;
                       return (
                         <label key={key} className="search-dropdown-option">
@@ -369,6 +397,9 @@ export function ProductSearchPanel({
                         </label>
                       );
                     })}
+                    {categoryPairsTypedFiltered.length === 0 && (
+                      <div className="search-dropdown-empty muted">Нет категорий по фильтру</div>
+                    )}
                   </div>
                 )}
               </div>

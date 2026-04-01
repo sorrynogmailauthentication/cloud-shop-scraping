@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LineChart,
@@ -248,6 +248,7 @@ function GraphContent({ token }: { token: string | null }) {
   const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
   const [snapshotYmd, setSnapshotYmd] = useState<string | null>(null);
   const [snapshotPriceSortDir, setSnapshotPriceSortDir] = useState<SnapshotPriceSortDir>(null);
+  const [exportPptBusy, setExportPptBusy] = useState(false);
 
   useEffect(() => {
     if (!currentListId) {
@@ -438,6 +439,130 @@ function GraphContent({ token }: { token: string | null }) {
     [chartData, displayItems.length]
   );
 
+  const exportGraphToPptx = useCallback(async () => {
+    if (sortedSnapshotRows.length === 0 || exportPptBusy) return;
+    setExportPptBusy(true);
+    try {
+      const { default: PptxGenJS } = await import('pptxgenjs');
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE';
+      pptx.author = 'Ценалитика';
+      pptx.subject = 'Экспорт графика';
+      pptx.title = `График ${fromDateLabel} - ${toDateLabel}`;
+
+      const graphSlide = pptx.addSlide();
+      graphSlide.background = { color: '1A2332' };
+      graphSlide.addText(`График: ${fromDateLabel} - ${toDateLabel}`, {
+        x: 0.35,
+        y: 0.2,
+        w: 12.0,
+        h: 0.35,
+        color: 'E6EDF3',
+        bold: true,
+        fontSize: 16,
+      });
+
+      const chartCategories = chartData.map((r) => String(r.date));
+      const fillSeriesGaps = (values: Array<number | null>): number[] => {
+        const out = values.slice();
+        let last: number | null = null;
+        for (let i = 0; i < out.length; i++) {
+          if (typeof out[i] === 'number') last = out[i] as number;
+          else if (last != null) out[i] = last;
+        }
+        let next: number | null = null;
+        for (let i = out.length - 1; i >= 0; i--) {
+          if (typeof out[i] === 'number') next = out[i] as number;
+          else if (next != null) out[i] = next;
+        }
+        return out.map((v) => (typeof v === 'number' ? v : 0));
+      };
+      const chartSeries = displayItems.map((item, i) => ({
+        name: obscureProductDisplayName(item.product?.product_name, item.product_url).slice(0, 80),
+        labels: chartCategories,
+        values: fillSeriesGaps(
+          chartData.map((r) => {
+            const v = r[`p${i}`];
+            return typeof v === 'number' ? v : null;
+          })
+        ),
+      }));
+
+      if (chartSeries.length > 0 && chartCategories.length > 0) {
+        graphSlide.addChart(pptx.ChartType.line, chartSeries, {
+          x: 0.35,
+          y: 0.75,
+          w: 12.0,
+          h: 6.25,
+          showLegend: true,
+          legendPos: 'b',
+          legendColor: 'E6EDF3',
+          catAxisLabelColor: 'E6EDF3',
+          valAxisLabelColor: 'E6EDF3',
+          catAxisTitleColor: 'E6EDF3',
+          valAxisTitleColor: 'E6EDF3',
+          catAxisLabelRotate: -45,
+          valAxisTitle: 'Цена',
+          catAxisTitle: 'Дата',
+          chartColors: displayItems.map((item) => chartColorForProductUrl(item.product_url).replace('#', '')),
+        });
+      } else {
+        graphSlide.addText('Нет данных графика для экспорта', {
+          x: 0.6,
+          y: 1.2,
+          w: 7.1,
+          h: 0.35,
+          color: '8B9CB3',
+          fontSize: 12,
+        });
+      }
+
+      const tableSlide = pptx.addSlide();
+      tableSlide.background = { color: '1A2332' };
+      tableSlide.addText(`Список товаров на дату: ${formatYmdDisplay(snapshotYmd ?? toYmd)}`, {
+        x: 0.35,
+        y: 0.2,
+        w: 12.0,
+        h: 0.35,
+        color: 'E6EDF3',
+        bold: true,
+        fontSize: 16,
+      });
+
+      const rows: string[][] = [
+        ['Товар', 'Магазин', 'Цена', 'До скидки', '%'],
+        ...sortedSnapshotRows.slice(0, 24).map(({ item, price, priceBeforeDiscount, discountPct }) => [
+          item.product?.product_name || item.product_url,
+          item.product?.shop ?? '—',
+          price != null ? formatPriceDisplay(price) : '—',
+          priceBeforeDiscount != null ? formatPriceDisplay(priceBeforeDiscount) : '—',
+          discountPct != null ? `${discountPct}%` : '—',
+        ]),
+      ];
+
+      tableSlide.addTable(rows, {
+        x: 0.35,
+        y: 0.85,
+        w: 12.0,
+        h: 6.2,
+        fontSize: 9,
+        color: 'E6EDF3',
+        border: { pt: 1, color: '2D3A4F' },
+        fill: '1A2332',
+        valign: 'middle',
+        colW: [6.2, 2.1, 1.2, 1.3, 1.2],
+      });
+
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      await pptx.writeFile({ fileName: `tsenalitika-graph-${dateStamp}.pptx` });
+    } catch (e) {
+      console.error('PPTX export failed:', e);
+      window.alert(e instanceof Error ? e.message : 'Не удалось экспортировать PPTX');
+    } finally {
+      setExportPptBusy(false);
+    }
+  }, [sortedSnapshotRows, exportPptBusy, fromDateLabel, toDateLabel, snapshotYmd, toYmd]);
+
   return (
     <div className="table-page-layout graph-page-layout">
       <ProductSearchPanel
@@ -507,6 +632,15 @@ function GraphContent({ token }: { token: string | null }) {
                   Очистить строки
                 </button>
               )}
+              <button
+                type="button"
+                className="btn-add-all table-toolbar-export"
+                disabled={displayItems.length === 0 || exportPptBusy}
+                onClick={() => void exportGraphToPptx()}
+                title="Скачать график и список в PowerPoint"
+              >
+                {exportPptBusy ? 'Экспорт…' : 'Экспорт PPTX'}
+              </button>
             </div>
           </div>
         </div>

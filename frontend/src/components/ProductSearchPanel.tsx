@@ -3,7 +3,6 @@ import { fetchShops, fetchShopCategoryPairs, searchProducts } from '../api/dashb
 import type { ShopCategoryPair } from '../api/dashboard';
 import type { ProductWithPrice } from '../types/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
-import { obscureProductDisplayName } from '../utils/productDisplay';
 
 const SEARCH_PAGE_SIZE = 20;
 
@@ -157,6 +156,18 @@ export function ProductSearchPanel({
     return list;
   }, [searchResults, existingUrls, resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]);
 
+  const hasClientResultFilters = useMemo(
+    () =>
+      Boolean(
+        resultFilterName1.trim() ||
+        resultFilterName2.trim() ||
+        resultFilterName3.trim() ||
+        priceAbove.trim() ||
+        priceBelow.trim()
+      ),
+    [resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]
+  );
+
   const handleSearchResultsScroll = useCallback(() => {
     const el = searchResultsRef.current;
     if (!el || searchLoadingMore || !searchHasMore) return;
@@ -165,6 +176,23 @@ export function ProductSearchPanel({
       loadMoreSearch();
     }
   }, [loadMoreSearch, searchLoadingMore, searchHasMore]);
+
+  useEffect(() => {
+    // If all currently loaded rows are already in the list, the panel can become non-scrollable,
+    // so onScroll will never fire. Auto-load the next page in this narrow case.
+    if (searchLoading || searchLoadingMore || !searchHasMore) return;
+    if (searchResults.length === 0 || filteredSearchResults.length > 0) return;
+    if (hasClientResultFilters) return;
+    void loadMoreSearch();
+  }, [
+    searchLoading,
+    searchLoadingMore,
+    searchHasMore,
+    searchResults.length,
+    filteredSearchResults.length,
+    hasClientResultFilters,
+    loadMoreSearch,
+  ]);
 
   const handleAddAll = async () => {
     const toAdd = filteredSearchResults.slice();
@@ -513,7 +541,7 @@ export function ProductSearchPanel({
               <div className="search-results" ref={searchResultsRef} onScroll={handleSearchResultsScroll}>
                 {filteredSearchResults.map((p) => (
                   <div key={p.url} className={`search-result-row ${resultRowClassName}`}>
-                    <span className="result-name">{obscureProductDisplayName(p.product_name, p.url)}</span>
+                    <span className="result-name">{p.product_name || p.url}</span>
                     <div className="result-shop-stack">
                       <span className="result-shop-main">{p.shop ?? '—'}</span>
                       {p.category ? <span className="result-shop-category">{p.category}</span> : null}

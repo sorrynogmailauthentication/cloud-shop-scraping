@@ -11,8 +11,8 @@ import type { PricePoint } from '../types/dashboard';
 import {
   TABLE_DATE_ANCHOR_YMD,
   timelineIdxToYmd,
+  timelineYmdToIdx,
   timelineMaxIdx,
-  defaultTimelineRange,
   enforceTimelineGap,
   priceClosestByYmd,
   deltaPctNumeric,
@@ -21,10 +21,21 @@ import {
   formatPriceDisplay,
   formatYmdDisplay,
 } from '../utils/priceHistory';
-import { obscureProductDisplayName } from '../utils/productDisplay';
+
+const TABLE_DATE_RANGE_STORAGE_KEY = 'table:date-range:v1';
+const TABLE_DEFAULT_START_YMD = '2026-03-29';
+const TABLE_SORT_STORAGE_PREFIX = 'table:sort:v1:';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function toExternalHref(rawUrl: string): string {
+  const s = rawUrl.trim();
+  if (!s) return rawUrl;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith('//')) return `https:${s}`;
+  return `https://${s}`;
 }
 
 type TableSortColumn =
@@ -40,6 +51,18 @@ type TableSortColumn =
   | 'deltaPct';
 
 type TableSortState = { key: TableSortColumn | null; dir: 'asc' | 'desc' | null };
+const TABLE_SORT_COLUMNS: TableSortColumn[] = [
+  'product',
+  'shop',
+  'category',
+  'link',
+  'price',
+  'beforeDiscount',
+  'discountPct',
+  'atStart',
+  'deltaPrice',
+  'deltaPct',
+];
 
 function cmpStr(a: string, b: string, dir: 'asc' | 'desc'): number {
   const c = a.localeCompare(b, undefined, { sensitivity: 'base' });
@@ -153,9 +176,21 @@ function TableContent({ token }: { token: string | null }) {
   useKeepScrollOnListSwitch(currentListId, listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
-  const [dateRange, setDateRange] = useState(() =>
-    defaultTimelineRange(timelineMaxIdx(TABLE_DATE_ANCHOR_YMD))
-  );
+  const [dateRange, setDateRange] = useState(() => {
+    const max = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
+    const defaultStart = timelineYmdToIdx(TABLE_DATE_ANCHOR_YMD, TABLE_DEFAULT_START_YMD, max);
+    const fallback = enforceTimelineGap(defaultStart, max, max);
+    if (typeof window === 'undefined') return fallback;
+    try {
+      const raw = window.localStorage.getItem(TABLE_DATE_RANGE_STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as { start?: unknown; end?: unknown };
+      if (typeof parsed.start !== 'number' || typeof parsed.end !== 'number') return fallback;
+      return enforceTimelineGap(parsed.start, parsed.end, max);
+    } catch {
+      return fallback;
+    }
+  });
   const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
   const [histLoading, setHistLoading] = useState(false);
   const [histError, setHistError] = useState('');
@@ -168,13 +203,59 @@ function TableContent({ token }: { token: string | null }) {
   const tableItemsWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setTableSort({ key: null, dir: null });
     setSelectedUrls(new Set());
   }, [currentListId]);
 
   useEffect(() => {
+    if (!currentListId) {
+      setTableSort({ key: null, dir: null });
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(`${TABLE_SORT_STORAGE_PREFIX}${currentListId}`);
+      if (!raw) {
+        setTableSort({ key: null, dir: null });
+        return;
+      }
+      const parsed = JSON.parse(raw) as { key?: unknown; dir?: unknown };
+      const key = parsed.key;
+      const dir = parsed.dir;
+      if (
+        (key === null || TABLE_SORT_COLUMNS.includes(key as TableSortColumn)) &&
+        (dir === null || dir === 'asc' || dir === 'desc')
+      ) {
+        setTableSort({
+          key: (key ?? null) as TableSortColumn | null,
+          dir: (dir ?? null) as 'asc' | 'desc' | null,
+        });
+      } else {
+        setTableSort({ key: null, dir: null });
+      }
+    } catch {
+      setTableSort({ key: null, dir: null });
+    }
+  }, [currentListId]);
+
+  useEffect(() => {
+    if (!currentListId) return;
+    try {
+      window.localStorage.setItem(`${TABLE_SORT_STORAGE_PREFIX}${currentListId}`, JSON.stringify(tableSort));
+    } catch {
+      // Ignore localStorage failures.
+    }
+  }, [currentListId, tableSort]);
+
+  useEffect(() => {
     setDateRange((r) => enforceTimelineGap(r.start, r.end, timelineMax));
   }, [timelineMax]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TABLE_DATE_RANGE_STORAGE_KEY, JSON.stringify(dateRange));
+    } catch {
+      // Ignore localStorage failures (e.g. private mode or blocked storage).
+    }
+  }, [dateRange]);
 
   const fromYmd = useMemo(
     () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.start),
@@ -272,7 +353,7 @@ function TableContent({ token }: { token: string | null }) {
         case 'link':
           return cmpStr(a.product_url.toLowerCase(), b.product_url.toLowerCase(), dir);
         case 'price':
-          return cmpNullableNum(a.product?.price ?? null, b.product?.price ?? null, dir);
+          return cmpNullableNum(getP0P1(a).p1, getP0P1(b).p1, dir);
         case 'beforeDiscount':
           return cmpNullableNum(
             a.product?.price_before_discount ?? null,
@@ -479,12 +560,6 @@ function TableContent({ token }: { token: string | null }) {
             </div>
           </div>
         </div>
-        {listWithItems && displayItems.length > 0 && (
-          <p className="widget-hint table-select-hint">
-            Drag across rows to select a range. Ctrl/⌘+click to toggle. Click ✕ on a selected row to remove
-            all selected. Click outside the table or Esc to clear selection.
-          </p>
-        )}
         {pendingItems !== null && (
           <p className="widget-hint">Unsaved row changes — click Save to write them to the server.</p>
         )}
@@ -517,6 +592,9 @@ function TableContent({ token }: { token: string | null }) {
                   >
                     Product
                   </SortableTh>
+                  <SortableTh columnKey="link" sort={tableSort} onSort={cycleTableSort}>
+                    Link
+                  </SortableTh>
                   <SortableTh
                     columnKey="shop"
                     sort={tableSort}
@@ -533,16 +611,28 @@ function TableContent({ token }: { token: string | null }) {
                   >
                     Category
                   </SortableTh>
-                  <SortableTh columnKey="link" sort={tableSort} onSort={cycleTableSort}>
-                    Link
+                  <SortableTh
+                    columnKey="atStart"
+                    sort={tableSort}
+                    onSort={cycleTableSort}
+                    className="table-col-num"
+                    title={`Closest price to ${fromDateLabel}`}
+                  >
+                    <abbr title={`Closest price to ${fromDateLabel}`}>Start price</abbr>
                   </SortableTh>
-                  <SortableTh columnKey="price" sort={tableSort} onSort={cycleTableSort}>
-                    Price
+                  <SortableTh
+                    columnKey="price"
+                    sort={tableSort}
+                    onSort={cycleTableSort}
+                    className="table-col-num"
+                  >
+                    <abbr title={`Closest price to ${toDateLabel}`}>End price</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="beforeDiscount"
                     sort={tableSort}
                     onSort={cycleTableSort}
+                    className="table-col-num"
                   >
                     Before discount
                   </SortableTh>
@@ -550,21 +640,15 @@ function TableContent({ token }: { token: string | null }) {
                     columnKey="discountPct"
                     sort={tableSort}
                     onSort={cycleTableSort}
+                    className="table-col-pct"
                   >
                     Discount %
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="atStart"
-                    sort={tableSort}
-                    onSort={cycleTableSort}
-                    title={`Closest price to ${fromDateLabel}`}
-                  >
-                    <abbr title={`Closest price to ${fromDateLabel}`}>@ start</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="deltaPrice"
                     sort={tableSort}
                     onSort={cycleTableSort}
+                    className="table-col-num"
                     title={`Price change, ${fromDateLabel} → ${toDateLabel}`}
                   >
                     <abbr title={`Price change, ${fromDateLabel} → ${toDateLabel}`}>Δ price</abbr>
@@ -573,6 +657,7 @@ function TableContent({ token }: { token: string | null }) {
                     columnKey="deltaPct"
                     sort={tableSort}
                     onSort={cycleTableSort}
+                    className="table-col-pct"
                     title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}
                   >
                     <abbr title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}>Δ %</abbr>
@@ -598,13 +683,11 @@ function TableContent({ token }: { token: string | null }) {
                         className="table-col-product"
                         title={item.product?.product_name || item.product_url}
                       >
-                        {obscureProductDisplayName(item.product?.product_name, item.product_url)}
+                        {item.product?.product_name || item.product_url}
                       </td>
-                      <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>
-                      <td className="cell-wrap table-col-category">{item.product?.category ?? '—'}</td>
                       <td>
                         <a
-                          href={item.product_url}
+                                href={toExternalHref(item.product_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="table-link"
@@ -613,34 +696,36 @@ function TableContent({ token }: { token: string | null }) {
                           Link
                         </a>
                       </td>
-                      <td>
-                        {item.product?.price != null ? formatPriceDisplay(item.product.price) : '—'}
+                      <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>
+                      <td className="cell-wrap table-col-category">{item.product?.category ?? '—'}</td>
+                      <td className="table-col-num">{histLoading ? '…' : p0 != null ? formatPriceDisplay(p0) : '—'}</td>
+                      <td className="table-col-num">
+                        {histLoading ? '…' : p1 != null ? formatPriceDisplay(p1) : '—'}
                       </td>
-                      <td>
+                      <td className="table-col-num">
                         {item.product?.price_before_discount != null
                           ? formatPriceDisplay(item.product.price_before_discount)
                           : '—'}
                       </td>
-                      <td>{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
-                      <td>{histLoading ? '…' : p0 != null ? formatPriceDisplay(p0) : '—'}</td>
+                      <td className="table-col-pct">{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
                       <td
                         className={
-                          dn != null && dn > 0
-                            ? 'table-delta table-delta--up'
+                          (dn != null && dn > 0
+                            ? 'table-delta table-delta--down'
                             : dn != null && dn < 0
-                              ? 'table-delta table-delta--down'
-                              : 'table-delta'
+                              ? 'table-delta table-delta--up'
+                              : 'table-delta') + ' table-col-num'
                         }
                       >
                         {histLoading ? '…' : formatDeltaPriceOnly(p0, p1)}
                       </td>
                       <td
                         className={
-                          dPct != null && dPct > 0
-                            ? 'table-delta table-delta--up'
+                          (dPct != null && dPct > 0
+                            ? 'table-delta table-delta--down'
                             : dPct != null && dPct < 0
-                              ? 'table-delta table-delta--down'
-                              : 'table-delta'
+                              ? 'table-delta table-delta--up'
+                              : 'table-delta') + ' table-col-pct'
                         }
                       >
                         {histLoading ? '…' : formatDeltaPctOnly(p0, p1)}

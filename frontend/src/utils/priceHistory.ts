@@ -1,7 +1,7 @@
 import type { PricePoint } from '../types/dashboard';
 
 /** Earliest selectable day on the timeline (absolute). */
-export const TABLE_DATE_ANCHOR_YMD = '2026-03-25';
+export const TABLE_DATE_ANCHOR_YMD = '2026-03-29';
 
 /** Format `YYYY-MM-DD` for UI (e.g. "25 Mar 2026"). */
 export function formatYmdDisplay(ymd: string): string {
@@ -26,6 +26,19 @@ export function timelineIdxToYmd(anchorYmd: string, dayIndex: number): string {
   const mm = String(t.getMonth() + 1).padStart(2, '0');
   const dd = String(t.getDate()).padStart(2, '0');
   return `${yy}-${mm}-${dd}`;
+}
+
+/** Index of `targetYmd` relative to anchor; clamped to [0, maxIdx]. */
+export function timelineYmdToIdx(anchorYmd: string, targetYmd: string, maxIdx: number): number {
+  const [ay, am, ad] = anchorYmd.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = targetYmd.slice(0, 10).split('-').map(Number);
+  if (!ay || !am || !ad || !ty || !tm || !td) return 0;
+  const anchor = new Date(ay, am - 1, ad);
+  anchor.setHours(0, 0, 0, 0);
+  const target = new Date(ty, tm - 1, td);
+  target.setHours(0, 0, 0, 0);
+  const raw = Math.round((target.getTime() - anchor.getTime()) / 86400000);
+  return Math.max(0, Math.min(maxIdx, raw));
 }
 
 /** Index of today relative to anchor (0 = anchor day). */
@@ -89,11 +102,10 @@ export function priceClosestByYmd(history: PricePoint[], targetYmd: string): num
   return p?.price ?? null;
 }
 
-/** Whole-euro amounts show two decimals (e.g. 12 → 12.00); others stay compact after cent rounding. */
+/** Always show prices with exactly two decimals (e.g. 12 -> 12.00, 135.9 -> 135.90). */
 export function formatPriceDisplay(price: number): string {
   const r = Math.round(price * 100) / 100;
-  if (Math.abs(r - Math.round(r)) < 1e-9) return Math.round(r).toFixed(2);
-  return String(parseFloat(r.toFixed(2)));
+  return r.toFixed(2);
 }
 
 export function formatPriceDelta(start: number | null, end: number | null): string {

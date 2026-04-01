@@ -19,7 +19,6 @@ import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import {
   TABLE_DATE_ANCHOR_YMD,
-  defaultTimelineRange,
   enforceTimelineGap,
   expandPriceFetchWindow,
   formatYmdDisplay,
@@ -27,6 +26,7 @@ import {
   pricePointClosestByYmd,
   formatPriceDisplay,
   timelineIdxToYmd,
+  timelineYmdToIdx,
   timelineMaxIdx,
 } from '../utils/priceHistory';
 import { obscureProductDisplayName } from '../utils/productDisplay';
@@ -45,12 +45,26 @@ type GraphPointTip = {
   left: number;
   top: number;
 };
+type SnapshotPriceSortDir = 'asc' | 'desc' | null;
 
 /** Matches `.graph-point-tooltip` max-width and typical height (long names may wrap). */
 const TOOLTIP_EST_W = 280;
 const TOOLTIP_EST_H = 120;
 const TOOLTIP_OFFSET = 14;
 const VIEW_MARGIN = 8;
+const GRAPH_DATE_RANGE_STORAGE_KEY = 'graph:date-range:v1';
+const GRAPH_DEFAULT_START_YMD = '2026-03-29';
+const GRAPH_SNAPSHOT_SORT_STORAGE_PREFIX = 'graph:snapshot-sort:v1:';
+
+function chartColorForProductUrl(productUrl: string): string {
+  // Stable color by item identity (not row/array position).
+  let h = 0;
+  for (let i = 0; i < productUrl.length; i++) {
+    h = (h * 31 + productUrl.charCodeAt(i)) | 0;
+  }
+  const idx = Math.abs(h) % CHART_SERIES_COLORS.length;
+  return CHART_SERIES_COLORS[idx];
+}
 
 function clampTooltipViewport(clientX: number, clientY: number): { left: number; top: number } {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 800;
@@ -188,13 +202,33 @@ function GraphContent({ token }: { token: string | null }) {
   useKeepScrollOnListSwitch(currentListId, listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
-  const [dateRange, setDateRange] = useState(() =>
-    defaultTimelineRange(timelineMaxIdx(TABLE_DATE_ANCHOR_YMD))
-  );
+  const [dateRange, setDateRange] = useState(() => {
+    const max = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
+    const defaultStart = timelineYmdToIdx(TABLE_DATE_ANCHOR_YMD, GRAPH_DEFAULT_START_YMD, max);
+    const fallback = enforceTimelineGap(defaultStart, max, max);
+    if (typeof window === 'undefined') return fallback;
+    try {
+      const raw = window.localStorage.getItem(GRAPH_DATE_RANGE_STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as { start?: unknown; end?: unknown };
+      if (typeof parsed.start !== 'number' || typeof parsed.end !== 'number') return fallback;
+      return enforceTimelineGap(parsed.start, parsed.end, max);
+    } catch {
+      return fallback;
+    }
+  });
 
   useEffect(() => {
     setDateRange((r) => enforceTimelineGap(r.start, r.end, timelineMax));
   }, [timelineMax]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GRAPH_DATE_RANGE_STORAGE_KEY, JSON.stringify(dateRange));
+    } catch {
+      // Ignore localStorage failures (e.g. private mode or blocked storage).
+    }
+  }, [dateRange]);
 
   const fromYmd = useMemo(
     () => timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.start),
@@ -213,16 +247,52 @@ function GraphContent({ token }: { token: string | null }) {
   const [chartError, setChartError] = useState('');
   const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
   const [snapshotYmd, setSnapshotYmd] = useState<string | null>(null);
+  const [snapshotPriceSortDir, setSnapshotPriceSortDir] = useState<SnapshotPriceSortDir>(null);
+  const [hoveredSnapshotUrl, setHoveredSnapshotUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentListId) {
+      setSnapshotPriceSortDir(null);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(`${GRAPH_SNAPSHOT_SORT_STORAGE_PREFIX}${currentListId}`);
+      if (raw === 'asc' || raw === 'desc') setSnapshotPriceSortDir(raw);
+      else setSnapshotPriceSortDir(null);
+    } catch {
+      setSnapshotPriceSortDir(null);
+    }
+  }, [currentListId]);
+
+  useEffect(() => {
+    if (!currentListId) return;
+    try {
+      const key = `${GRAPH_SNAPSHOT_SORT_STORAGE_PREFIX}${currentListId}`;
+      if (snapshotPriceSortDir == null) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, snapshotPriceSortDir);
+    } catch {
+      // Ignore localStorage failures.
+    }
+  }, [currentListId, snapshotPriceSortDir]);
 
   const chartItemsKey = useMemo(
     () => displayItems.map((i) => i.product_url).join('\0'),
     [displayItems]
   );
 
+  const preserveScrollAfterListMutation = () => {
+    const y = window.scrollY;
+    requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    });
+  };
+
   const removeFromList = (productUrl: string) => {
     if (!currentListId) return;
     const base = pendingItems ?? listWithItems?.items ?? [];
     setPendingItems(base.filter((i) => i.product_url !== productUrl));
+    preserveScrollAfterListMutation();
   };
 
   const handleClearRows = () => {
@@ -331,10 +401,23 @@ function GraphContent({ token }: { token: string | null }) {
         price: pt?.price ?? null,
         priceBeforeDiscount: pt?.price_before_discount ?? null,
         discountPct: pt?.discount_pct ?? null,
-        color: CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length],
+        color: chartColorForProductUrl(item.product_url),
       };
     });
   }, [snapshotYmd, toYmd, displayItems, histByUrl]);
+
+  const sortedSnapshotRows = useMemo(() => {
+    if (snapshotPriceSortDir == null) return snapshotRows;
+    const rows = [...snapshotRows];
+    rows.sort((a, b) => {
+      if (a.price == null && b.price == null) return 0;
+      if (a.price == null) return 1;
+      if (b.price == null) return -1;
+      const diff = a.price - b.price;
+      return snapshotPriceSortDir === 'asc' ? diff : -diff;
+    });
+    return rows;
+  }, [snapshotRows, snapshotPriceSortDir]);
 
   const lineLabel = (item: UserListItem) =>
     obscureProductDisplayName(item.product?.product_name, item.product_url);
@@ -344,7 +427,7 @@ function GraphContent({ token }: { token: string | null }) {
       displayItems.map((item, i) =>
         lineDotRenderer(
           obscureProductDisplayName(item.product?.product_name, item.product_url),
-          CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length],
+          chartColorForProductUrl(item.product_url),
           setPointTip
         )
       ),
@@ -451,7 +534,7 @@ function GraphContent({ token }: { token: string | null }) {
           />
         )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && !chartLoading && (
+        {listWithItems && !listLoading && displayItems.length > 0 && (
           <div className="graph-snapshot-panel">
             <div className="graph-snapshot-panel-head">
               <label className="graph-snapshot-date-field">
@@ -480,18 +563,35 @@ function GraphContent({ token }: { token: string | null }) {
                 <div className="graph-snapshot-list-head" aria-hidden>
                   <span className="graph-snapshot-col-name">Product</span>
                   <span className="graph-snapshot-col-shop">Shop</span>
-                  <span className="graph-snapshot-col-num">Price</span>
+                  <button
+                    type="button"
+                    className="graph-snapshot-col-num table-sort-btn"
+                    onClick={() =>
+                      setSnapshotPriceSortDir((prev) =>
+                        prev == null ? 'asc' : prev === 'asc' ? 'desc' : null
+                      )
+                    }
+                    title="Sort by snapshot price"
+                  >
+                    <span className="table-sort-label">Price</span>
+                    <span className="table-sort-arrows" aria-hidden>
+                      <span className={`table-sort-arrow ${snapshotPriceSortDir === 'asc' ? 'is-active' : ''}`}>▲</span>
+                      <span className={`table-sort-arrow ${snapshotPriceSortDir === 'desc' ? 'is-active' : ''}`}>▼</span>
+                    </span>
+                  </button>
                   <span className="graph-snapshot-col-num">Before discount</span>
                   <span className="graph-snapshot-col-pct">%</span>
                   <span className="graph-snapshot-col-remove" />
                 </div>
                 <ul className="graph-snapshot-list" aria-label="Product prices for selected date">
-                  {snapshotRows.map(
+                  {sortedSnapshotRows.map(
                     ({ item, price, priceBeforeDiscount, discountPct, color }) => (
                       <li
                         key={item.product_url}
                         className="graph-snapshot-row"
                         style={{ borderLeftColor: color }}
+                        onMouseEnter={() => setHoveredSnapshotUrl(item.product_url)}
+                        onMouseLeave={() => setHoveredSnapshotUrl((prev) => (prev === item.product_url ? null : prev))}
                       >
                         <span className="graph-snapshot-name" title={item.product?.product_name || item.product_url}>
                           {item.product?.product_name || item.product_url}
@@ -534,7 +634,7 @@ function GraphContent({ token }: { token: string | null }) {
           </div>
         )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length > 0 && !chartLoading && (
+        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length > 0 && (
           <div className="chart-container table-wrap">
             <ResponsiveContainer width="100%" height={720}>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -555,9 +655,10 @@ function GraphContent({ token }: { token: string | null }) {
                     type="monotone"
                     dataKey={`p${i}`}
                     name={lineLabel(item)}
-                    stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]}
+                    stroke={chartColorForProductUrl(item.product_url)}
                     strokeDasharray={chartSeriesStrokeDash(i)}
-                    strokeWidth={2}
+                    strokeWidth={hoveredSnapshotUrl === item.product_url ? 3.5 : 2}
+                    strokeOpacity={hoveredSnapshotUrl && hoveredSnapshotUrl !== item.product_url ? 0.22 : 1}
                     dot={lineDotFns[i]}
                     connectNulls
                   />

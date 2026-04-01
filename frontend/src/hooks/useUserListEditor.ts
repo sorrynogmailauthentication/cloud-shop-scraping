@@ -29,6 +29,7 @@ export type UserListEditorOptions = {
 export function useUserListEditor(token: string | null, options: UserListEditorOptions) {
   const { listKind } = options;
   const defaultListName = listKind === 'graph' ? 'My graph' : 'My table';
+  const selectedListStorageKey = `list-editor:selected-list:${listKind}`;
 
   const [lists, setLists] = useState<UserList[]>([]);
   const [currentListId, setCurrentListId] = useState<string | null>(null);
@@ -38,6 +39,11 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
   const [saveTableName, setSaveTableName] = useState('');
   const [tableToolsBusy, setTableToolsBusy] = useState(false);
   const saveNameSyncedForListIdRef = useRef<string | null>(null);
+  const pendingHydratedKeyRef = useRef<string | null>(null);
+  const pendingStorageKey = useMemo(
+    () => (currentListId ? `list-editor:pending:${listKind}:${currentListId}` : null),
+    [listKind, currentListId]
+  );
 
   const loadLists = useCallback(async () => {
     if (!token) return;
@@ -55,6 +61,14 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       setLists(L);
       setCurrentListId((prev) => {
         if (L.length === 0) return null;
+        if (typeof window !== 'undefined') {
+          try {
+            const stored = window.localStorage.getItem(selectedListStorageKey);
+            if (stored && L.some((l) => l.id === stored)) return stored;
+          } catch {
+            // Ignore storage failures.
+          }
+        }
         if (prev && L.some((l) => l.id === prev)) return prev;
         return L[0].id;
       });
@@ -62,7 +76,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       setLists([]);
       setCurrentListId(null);
     }
-  }, [token, listKind, defaultListName]);
+  }, [token, listKind, defaultListName, selectedListStorageKey]);
 
   const loadListWithItems = useCallback(
     async (options?: { silent?: boolean; forListId?: string | null }) => {
@@ -94,8 +108,61 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
   }, [loadListWithItems]);
 
   useEffect(() => {
-    setPendingItems(null);
-  }, [currentListId]);
+    if (!currentListId) return;
+    try {
+      window.localStorage.setItem(selectedListStorageKey, currentListId);
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [currentListId, selectedListStorageKey]);
+
+  useEffect(() => {
+    if (!pendingStorageKey) {
+      pendingHydratedKeyRef.current = null;
+      setPendingItems(null);
+      return;
+    }
+    if (typeof window === 'undefined') {
+      pendingHydratedKeyRef.current = pendingStorageKey;
+      setPendingItems(null);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(pendingStorageKey);
+      if (!raw) {
+        setPendingItems(null);
+      } else {
+        const parsed = JSON.parse(raw) as unknown;
+        if (
+          Array.isArray(parsed) &&
+          parsed.every((row) => row && typeof row === 'object' && typeof (row as UserListItem).product_url === 'string')
+        ) {
+          setPendingItems(parsed as UserListItem[]);
+        } else {
+          setPendingItems(null);
+        }
+      }
+    } catch {
+      setPendingItems(null);
+    } finally {
+      pendingHydratedKeyRef.current = pendingStorageKey;
+    }
+  }, [pendingStorageKey]);
+
+  useEffect(() => {
+    if (!pendingStorageKey) return;
+    if (pendingHydratedKeyRef.current !== pendingStorageKey) return;
+    if (typeof window === 'undefined') return;
+    try {
+      if (pendingItems === null) {
+        window.localStorage.removeItem(pendingStorageKey);
+      } else {
+        window.localStorage.setItem(pendingStorageKey, JSON.stringify(pendingItems));
+      }
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [pendingStorageKey, pendingItems]);
 
   useEffect(() => {
     if (!listWithItems || listWithItems.id !== currentListId) return;

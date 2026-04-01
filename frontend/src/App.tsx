@@ -9,7 +9,7 @@ import AdminPanel from './pages/AdminPanel';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="app-loading">Loading</div>;
+  if (loading) return <div className="app-loading">Загрузка</div>;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

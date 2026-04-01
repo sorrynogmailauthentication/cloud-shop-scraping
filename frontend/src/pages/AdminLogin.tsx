@@ -23,7 +23,7 @@ export default function AdminLogin() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || 'Login failed');
+        setError(data.error || 'Ошибка входа');
         return;
       }
       if (data.token) {
@@ -31,7 +31,7 @@ export default function AdminLogin() {
         navigate('/admin', { replace: true });
       }
     } catch {
-      setError('Network error');
+      setError('Ошибка сети');
     } finally {
       setLoading(false);
     }
@@ -41,10 +41,10 @@ export default function AdminLogin() {
     <div className="login-page">
       <div className="login-card">
         <p className="admin-login-home">
-          <Link to="/">← Home</Link>
+          <Link to="/">← На главную</Link>
         </p>
-        <h1>Admin</h1>
-        <p className="login-sub">Sign in with login and password</p>
+        <h1>Админ</h1>
+        <p className="login-sub">Вход по логину и паролю</p>
         {error && (
           <div className="login-error" role="alert">
             {error}
@@ -53,7 +53,7 @@ export default function AdminLogin() {
         <form onSubmit={handleSubmit}>
           <input
             type="text"
-            placeholder="Login"
+            placeholder="Логин"
             value={login}
             onChange={(e) => setLogin(e.target.value)}
             className="input-field"
@@ -62,7 +62,7 @@ export default function AdminLogin() {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Пароль"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input-field"
@@ -70,7 +70,7 @@ export default function AdminLogin() {
             required
           />
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Вход…' : 'Войти'}
           </button>
         </form>
       </div>

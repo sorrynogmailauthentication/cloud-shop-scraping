@@ -153,10 +153,10 @@ export default function GraphPage() {
   if (!user?.isPaid) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Please wait for admin confirmation</h2>
+        <h2>Ожидайте подтверждения от администратора</h2>
         <p className="muted">
-          Your account (<strong>{user?.displayName || user?.login}</strong>
-          {user?.email && ` — ${user.email}`}) is pending.
+          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>
+          {user?.email && ` — ${user.email}`}) ожидает подтверждения.
         </p>
       </main>
     );
@@ -164,15 +164,15 @@ export default function GraphPage() {
   if (!hasAccess && user.accessUntil) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Access expired</h2>
-        <p className="muted">Your access ended on <strong>{user.accessUntil}</strong>.</p>
+        <h2>Доступ истек</h2>
+        <p className="muted">Ваш доступ завершился <strong>{user.accessUntil}</strong>.</p>
       </main>
     );
   }
 
   return (
     <main className="dashboard graph-page">
-      <h2>Graph</h2>
+      <h2>График</h2>
       <GraphContent token={token} />
     </main>
   );
@@ -248,7 +248,6 @@ function GraphContent({ token }: { token: string | null }) {
   const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
   const [snapshotYmd, setSnapshotYmd] = useState<string | null>(null);
   const [snapshotPriceSortDir, setSnapshotPriceSortDir] = useState<SnapshotPriceSortDir>(null);
-  const [hoveredSnapshotUrl, setHoveredSnapshotUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentListId) {
@@ -447,16 +446,16 @@ function GraphContent({ token }: { token: string | null }) {
         addDisabled={!currentListId}
         onAddOne={addOneToList}
         onAddAll={handleAddAllFromSearch}
-        addAllLabel="Add all loaded to graph"
-        addOneTitle="Add to graph"
-        alreadyInPhrase="graph"
+        addAllLabel="Добавить всё загруженное в график"
+        addOneTitle="Добавить в график"
+        alreadyInPhrase="графике"
       />
 
       <section className="table-section graph-chart-section">
         <div className="table-toolbar-wrap">
           <div className="table-toolbar">
             <label className="table-toolbar-field">
-              <span className="table-toolbar-label">Graph</span>
+              <span className="table-toolbar-label">График</span>
               <select
                 className="list-select table-toolbar-select"
                 value={currentListId ?? ''}
@@ -464,7 +463,7 @@ function GraphContent({ token }: { token: string | null }) {
                 disabled={lists.length === 0 || tableToolsBusy}
               >
                 {lists.length === 0 ? (
-                  <option value="">No saved graphs</option>
+                  <option value="">Нет сохраненных графиков</option>
                 ) : (
                   lists.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -475,13 +474,13 @@ function GraphContent({ token }: { token: string | null }) {
               </select>
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">
-              <span className="table-toolbar-label">Name</span>
+              <span className="table-toolbar-label">Название</span>
               <input
                 type="text"
                 className="search-input table-toolbar-name"
                 value={saveTableName}
                 onChange={(e) => setSaveTableName(e.target.value)}
-                placeholder="My table"
+                placeholder="график 1"
                 disabled={tableToolsBusy}
                 autoComplete="off"
               />
@@ -493,7 +492,7 @@ function GraphContent({ token }: { token: string | null }) {
                 disabled={tableToolsBusy || !saveTableName.trim()}
                 onClick={() => void handleSaveTableCopy()}
               >
-                Save
+                Сохранить
               </button>
               <button
                 type="button"
@@ -501,11 +500,11 @@ function GraphContent({ token }: { token: string | null }) {
                 disabled={tableToolsBusy || !currentListId}
                 onClick={() => void handleDeleteTable()}
               >
-                Delete
+                Удалить
               </button>
               {currentListId && (
                 <button type="button" className="btn-clear-table" onClick={handleClearRows} disabled={tableToolsBusy}>
-                  Clear rows
+                  Очистить строки
                 </button>
               )}
             </div>
@@ -513,12 +512,12 @@ function GraphContent({ token }: { token: string | null }) {
         </div>
 
         {pendingItems !== null && (
-          <p className="widget-hint">Unsaved row changes — click Save to write them to the server.</p>
+          <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
         )}
         {!currentListId && lists.length === 0 && (
-          <p className="widget-hint muted">Loading your graph…</p>
+          <p className="widget-hint muted">Загрузка вашего графика…</p>
         )}
-        {listLoading && <p className="muted">Loading…</p>}
+        {listLoading && <p className="muted">Загрузка…</p>}
 
         {listWithItems && !listLoading && displayItems.length > 0 && (
           <DateRangeSlicerPanel
@@ -538,7 +537,7 @@ function GraphContent({ token }: { token: string | null }) {
           <div className="graph-snapshot-panel">
             <div className="graph-snapshot-panel-head">
               <label className="graph-snapshot-date-field">
-                <span className="graph-snapshot-label">Prices on</span>
+                <span className="graph-snapshot-label">Цены на дату</span>
                 <input
                   type="date"
                   className="graph-snapshot-date-input"
@@ -549,7 +548,7 @@ function GraphContent({ token }: { token: string | null }) {
                     const v = e.target.value;
                     if (v >= fromYmd && v <= toYmd) setSnapshotYmd(v);
                   }}
-                  aria-label="Date for price list"
+                  aria-label="Дата для списка цен"
                 />
               </label>
               <span className="graph-snapshot-date-hint muted">
@@ -561,8 +560,8 @@ function GraphContent({ token }: { token: string | null }) {
             ) : (
               <>
                 <div className="graph-snapshot-list-head" aria-hidden>
-                  <span className="graph-snapshot-col-name">Product</span>
-                  <span className="graph-snapshot-col-shop">Shop</span>
+                  <span className="graph-snapshot-col-name">Товар</span>
+                  <span className="graph-snapshot-col-shop">Магазин</span>
                   <button
                     type="button"
                     className="graph-snapshot-col-num table-sort-btn"
@@ -571,27 +570,25 @@ function GraphContent({ token }: { token: string | null }) {
                         prev == null ? 'asc' : prev === 'asc' ? 'desc' : null
                       )
                     }
-                    title="Sort by snapshot price"
+                    title="Сортировать по цене на выбранную дату"
                   >
-                    <span className="table-sort-label">Price</span>
+                    <span className="table-sort-label">Цена</span>
                     <span className="table-sort-arrows" aria-hidden>
                       <span className={`table-sort-arrow ${snapshotPriceSortDir === 'asc' ? 'is-active' : ''}`}>▲</span>
                       <span className={`table-sort-arrow ${snapshotPriceSortDir === 'desc' ? 'is-active' : ''}`}>▼</span>
                     </span>
                   </button>
-                  <span className="graph-snapshot-col-num">Before discount</span>
+                  <span className="graph-snapshot-col-num">До скидки</span>
                   <span className="graph-snapshot-col-pct">%</span>
                   <span className="graph-snapshot-col-remove" />
                 </div>
-                <ul className="graph-snapshot-list" aria-label="Product prices for selected date">
+                <ul className="graph-snapshot-list" aria-label="Цены товаров на выбранную дату">
                   {sortedSnapshotRows.map(
                     ({ item, price, priceBeforeDiscount, discountPct, color }) => (
                       <li
                         key={item.product_url}
                         className="graph-snapshot-row"
                         style={{ borderLeftColor: color }}
-                        onMouseEnter={() => setHoveredSnapshotUrl(item.product_url)}
-                        onMouseLeave={() => setHoveredSnapshotUrl((prev) => (prev === item.product_url ? null : prev))}
                       >
                         <span className="graph-snapshot-name" title={item.product?.product_name || item.product_url}>
                           {item.product?.product_name || item.product_url}
@@ -616,8 +613,8 @@ function GraphContent({ token }: { token: string | null }) {
                             type="button"
                             className="btn-remove"
                             onClick={() => removeFromList(item.product_url)}
-                            title="Remove from list"
-                            aria-label="Remove from list"
+                            title="Удалить из списка"
+                            aria-label="Удалить из списка"
                           >
                             ✕
                           </button>
@@ -629,7 +626,7 @@ function GraphContent({ token }: { token: string | null }) {
               </>
             )}
             <p className="graph-snapshot-footnote muted">
-              When no price exists for that exact day, the closest available price in history is shown (same as the chart).
+              Если на выбранный день нет цены, показывается ближайшая доступная цена из истории (как на графике).
             </p>
           </div>
         )}
@@ -657,8 +654,7 @@ function GraphContent({ token }: { token: string | null }) {
                     name={lineLabel(item)}
                     stroke={chartColorForProductUrl(item.product_url)}
                     strokeDasharray={chartSeriesStrokeDash(i)}
-                    strokeWidth={hoveredSnapshotUrl === item.product_url ? 3.5 : 2}
-                    strokeOpacity={hoveredSnapshotUrl && hoveredSnapshotUrl !== item.product_url ? 0.22 : 1}
+                    strokeWidth={2}
                     dot={lineDotFns[i]}
                     connectNulls
                   />
@@ -669,11 +665,11 @@ function GraphContent({ token }: { token: string | null }) {
         )}
 
         {listWithItems && !listLoading && displayItems.length > 0 && chartData.length === 0 && !chartLoading && !chartError && (
-          <p className="widget-hint muted">No price points in this date range.</p>
+          <p className="widget-hint muted">Нет цен в выбранном диапазоне дат.</p>
         )}
 
         {listWithItems && !listLoading && displayItems.length === 0 && (
-          <p className="widget-hint">Search and add products, then adjust the date range. Save to persist the list.</p>
+          <p className="widget-hint">Найдите и добавьте товары, затем настройте диапазон дат. Нажмите "Сохранить", чтобы закрепить список.</p>
         )}
       </section>
 

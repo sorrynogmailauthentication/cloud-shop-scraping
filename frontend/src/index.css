@@ -153,6 +153,7 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
 }
 .logo {
   font-weight: 700;
@@ -163,6 +164,9 @@ html {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .nav-link {
   padding: 0.4rem 0.75rem;
@@ -183,6 +187,21 @@ html {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-left: auto;
+}
+@media (max-width: 900px) {
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+  }
+  .header-nav {
+    position: static;
+    left: auto;
+    transform: none;
+    width: 100%;
+    justify-content: center;
+    order: 3;
+  }
 }
 .subscription-badge {
   font-size: 0.8rem;
@@ -399,8 +418,12 @@ html {
   max-width: 21rem;
 }
 .btn-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 1rem;
   font-size: 0.9rem;
+  line-height: 1;
   width: auto;
   margin: 0;
 }
@@ -1129,7 +1152,7 @@ html {
 .table-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 0.65rem 1rem;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.75rem;
@@ -1140,6 +1163,7 @@ html {
 .table-toolbar-field {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.25rem;
   min-width: 0;
 }
@@ -1147,14 +1171,18 @@ html {
   flex: 1 1 12rem;
 }
 .table-toolbar-label {
-  font-size: 0.75rem;
+  display: block;
+  width: 100%;
+  font-size: 0.8rem;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  line-height: 1.2;
+  margin-bottom: 0.1rem;
+  text-align: center;
 }
 .table-toolbar-select {
   min-width: 10rem;
   max-width: 18rem;
+  cursor: pointer;
 }
 .table-toolbar-name {
   width: 100%;
@@ -1171,20 +1199,45 @@ html {
   box-sizing: border-box;
   border-radius: 8px;
   font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
 .table-toolbar-select {
-  padding: 0 0.65rem;
-  line-height: 1.2;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 0 2rem 0 0.75rem;
+  line-height: calc(var(--search-control-height) - 2px);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 9px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
 .table-toolbar .table-toolbar-name.search-input {
   padding: 0 0.75rem;
   line-height: calc(var(--search-control-height) - 2px);
+}
+.table-toolbar-select:hover,
+.table-toolbar .table-toolbar-name.search-input:hover {
+  border-color: var(--muted);
+}
+.table-toolbar-select:focus,
+.table-toolbar .table-toolbar-name.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .table-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+}
+.table-toolbar-actions .btn-add-all,
+.table-toolbar-actions .btn-clear-table {
+  height: var(--search-control-height);
+  cursor: pointer;
 }
 .table-section-header {
   display: flex;
@@ -1323,11 +1376,41 @@ html {
 .graph-snapshot-date-input {
   font: inherit;
   font-size: 0.875rem;
-  padding: 0.35rem 0.5rem;
+  height: var(--search-control-height);
+  padding: 0 2.1rem 0 0.75rem;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  line-height: calc(var(--search-control-height) - 2px);
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+}
+.graph-snapshot-date-input:hover {
+  border-color: var(--muted);
+}
+.graph-snapshot-date-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.graph-snapshot-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.75;
+  cursor: pointer;
+  filter: invert(78%) sepia(13%) saturate(356%) hue-rotate(176deg) brightness(90%) contrast(86%);
+}
+.graph-snapshot-date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.graph-snapshot-date-input::-webkit-datetime-edit {
+  color: var(--text);
+}
+.graph-snapshot-date-input::-webkit-datetime-edit-text {
+  color: var(--muted);
+}
+.graph-snapshot-date-input::-webkit-clear-button,
+.graph-snapshot-date-input::-webkit-inner-spin-button {
+  display: none;
 }
 .graph-snapshot-date-hint {
   font-size: 0.8125rem;
@@ -1577,11 +1660,34 @@ html {
   cursor: pointer;
 }
 .admin-date-input {
-  padding: 0.35rem 0.5rem;
+  height: var(--search-control-height);
+  padding: 0 2.1rem 0 0.75rem;
   font-size: 0.9rem;
   font-family: inherit;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  line-height: calc(var(--search-control-height) - 2px);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.admin-date-input:hover {
+  border-color: var(--muted);
+}
+.admin-date-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.admin-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.75;
+  cursor: pointer;
+  filter: invert(78%) sepia(13%) saturate(356%) hue-rotate(176deg) brightness(90%) contrast(86%);
+}
+.admin-date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.admin-date-input::-webkit-clear-button,
+.admin-date-input::-webkit-inner-spin-button {
+  display: none;
 }

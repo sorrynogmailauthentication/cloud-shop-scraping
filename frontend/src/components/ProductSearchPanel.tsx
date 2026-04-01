@@ -24,9 +24,9 @@ export function ProductSearchPanel({
   addDisabled = false,
   onAddOne,
   onAddAll,
-  addAllLabel = 'Add all loaded to table',
-  addOneTitle = 'Add to table',
-  alreadyInPhrase = 'table',
+  addAllLabel = 'Добавить всё загруженное в таблицу',
+  addOneTitle = 'Добавить в таблицу',
+  alreadyInPhrase = 'таблице',
   resultRowClassName = 'search-result-row--table',
 }: ProductSearchPanelProps) {
   const [searchOpen, setSearchOpen] = useState(true);
@@ -103,7 +103,7 @@ export function ProductSearchPanel({
       setSearchResults(products);
       setSearchHasMore(products.length === SEARCH_PAGE_SIZE);
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : 'Search failed');
+      setSearchError(e instanceof Error ? e.message : 'Ошибка поиска');
       setSearchResults([]);
       setSearchHasMore(false);
     } finally {
@@ -241,19 +241,15 @@ export function ProductSearchPanel({
         onClick={toggleSearchOpen}
         aria-expanded={searchOpen}
       >
-        {searchOpen ? '▼ Close search' : '▶ Search products'}
+        {searchOpen ? '▼ Скрыть поиск' : '▶ Поиск товаров'}
       </button>
       {searchOpen && (
         <div className="search-panel-inner">
-          <p className="widget-hint">
-            By name, shop(s), category (Shop - Category), or URL. Use ✕ on each field to clear; shops and
-            categories reset to all.
-          </p>
           <div className="search-form">
             <div className="search-field-with-clear search-field-with-clear--name">
               <input
                 type="text"
-                placeholder="Name (partial)"
+                placeholder="Название (часть)"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -264,15 +260,15 @@ export function ProductSearchPanel({
                 className="search-field-clear"
                 disabled={!searchQ.trim()}
                 onClick={() => setSearchQ('')}
-                aria-label="Clear name"
-                title="Clear name"
+                aria-label="Очистить название"
+                title="Очистить название"
               >
                 ✕
               </button>
             </div>
             <div className="search-field-with-clear search-field-with-clear--shop">
               <div className="search-dropdown-wrap search-dropdown-wrap--shop" ref={shopDropdownRef}>
-                <label className="search-multi-label">Shop</label>
+                <label className="search-multi-label">Магазин</label>
                 <button
                   type="button"
                   className="search-dropdown-trigger"
@@ -280,10 +276,10 @@ export function ProductSearchPanel({
                   aria-expanded={shopDropdownOpen}
                 >
                   {searchShops.length === 0
-                    ? 'All shops'
+                    ? 'Все магазины'
                     : searchShops.length === 1
                       ? searchShops[0]
-                      : `${searchShops.length} shops`}
+                      : `${searchShops.length} магаз.`}
                 </button>
                 {shopDropdownOpen && (
                   <div className="search-dropdown-panel">
@@ -293,7 +289,7 @@ export function ProductSearchPanel({
                         checked={searchShops.length === 0}
                         onChange={() => setSearchShops([])}
                       />
-                      <span>All shops</span>
+                      <span>Все магазины</span>
                     </label>
                     {shopsFiltered.map((s) => (
                       <label key={s} className="search-dropdown-option">
@@ -320,15 +316,15 @@ export function ProductSearchPanel({
                   setSearchShops([]);
                   setShopDropdownOpen(false);
                 }}
-                aria-label="Reset shops to all"
-                title="All shops"
+                aria-label="Сбросить выбор магазинов"
+                title="Все магазины"
               >
                 ✕
               </button>
             </div>
             <div className="search-field-with-clear search-field-with-clear--categories">
               <div className="search-dropdown-wrap search-dropdown-wrap--categories" ref={categoryDropdownRef}>
-                <label className="search-multi-label">Shop - Category</label>
+                <label className="search-multi-label">Магазин - Категория</label>
                 <button
                   type="button"
                   className="search-dropdown-trigger search-dropdown-trigger--categories"
@@ -336,13 +332,13 @@ export function ProductSearchPanel({
                   aria-expanded={categoryDropdownOpen}
                 >
                   {searchCategoryPairs.length === 0
-                    ? 'All categories'
+                    ? 'Все категории'
                     : searchCategoryPairs.length === 1
                       ? (() => {
                           const p = shopCategoryPairs.find((x) => `${x.shop}|${x.category}` === searchCategoryPairs[0]);
-                          return p ? `${p.shop} - ${p.category}` : '1 category';
+                          return p ? `${p.shop} - ${p.category}` : '1 категория';
                         })()
-                      : `${searchCategoryPairs.length} categories`}
+                      : `${searchCategoryPairs.length} катег.`}
                 </button>
                 {categoryDropdownOpen && (
                   <div className="search-dropdown-panel search-dropdown-panel--categories">
@@ -352,7 +348,7 @@ export function ProductSearchPanel({
                         checked={searchCategoryPairs.length === 0}
                         onChange={() => setSearchCategoryPairs([])}
                       />
-                      <span>All categories</span>
+                      <span>Все категории</span>
                     </label>
                     {categoryPairsFiltered.map((p) => {
                       const key = `${p.shop}|${p.category}`;
@@ -384,8 +380,8 @@ export function ProductSearchPanel({
                   setSearchCategoryPairs([]);
                   setCategoryDropdownOpen(false);
                 }}
-                aria-label="Reset categories to all"
-                title="All categories"
+                aria-label="Сбросить выбор категорий"
+                title="Все категории"
               >
                 ✕
               </button>
@@ -393,7 +389,7 @@ export function ProductSearchPanel({
             <div className="search-field-with-clear search-field-with-clear--url">
               <input
                 type="text"
-                placeholder="URL (partial)"
+                placeholder="Ссылка (часть)"
                 value={searchUrl}
                 onChange={(e) => setSearchUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -404,14 +400,14 @@ export function ProductSearchPanel({
                 className="search-field-clear"
                 disabled={!searchUrl.trim()}
                 onClick={() => setSearchUrl('')}
-                aria-label="Clear URL"
-                title="Clear URL"
+                aria-label="Очистить ссылку"
+                title="Очистить ссылку"
               >
                 ✕
               </button>
             </div>
             <button type="button" className="btn-primary btn-search" onClick={runSearch} disabled={searchLoading}>
-              {searchLoading ? 'Searching…' : 'Search'}
+              {searchLoading ? 'Поиск…' : 'Поиск'}
             </button>
           </div>
           {searchError && <div className="widget-error">{searchError}</div>}
@@ -419,7 +415,7 @@ export function ProductSearchPanel({
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
                 type="text"
-                placeholder="Name contains (1)"
+                placeholder="Название содержит (1)"
                 value={resultFilterName1}
                 onChange={(e) => setResultFilterName1(e.target.value)}
                 className="search-input search-filter-text"
@@ -429,8 +425,8 @@ export function ProductSearchPanel({
                 className="search-field-clear"
                 disabled={!resultFilterName1.trim()}
                 onClick={() => setResultFilterName1('')}
-                aria-label="Clear name filter 1"
-                title="Clear"
+                aria-label="Очистить фильтр названия 1"
+                title="Очистить"
               >
                 ✕
               </button>
@@ -438,7 +434,7 @@ export function ProductSearchPanel({
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
                 type="text"
-                placeholder="Name contains (2)"
+                placeholder="Название содержит (2)"
                 value={resultFilterName2}
                 onChange={(e) => setResultFilterName2(e.target.value)}
                 className="search-input search-filter-text"
@@ -448,8 +444,8 @@ export function ProductSearchPanel({
                 className="search-field-clear"
                 disabled={!resultFilterName2.trim()}
                 onClick={() => setResultFilterName2('')}
-                aria-label="Clear name filter 2"
-                title="Clear"
+                aria-label="Очистить фильтр названия 2"
+                title="Очистить"
               >
                 ✕
               </button>
@@ -457,7 +453,7 @@ export function ProductSearchPanel({
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
                 type="text"
-                placeholder="Name contains (3)"
+                placeholder="Название содержит (3)"
                 value={resultFilterName3}
                 onChange={(e) => setResultFilterName3(e.target.value)}
                 className="search-input search-filter-text"
@@ -467,8 +463,8 @@ export function ProductSearchPanel({
                 className="search-field-clear"
                 disabled={!resultFilterName3.trim()}
                 onClick={() => setResultFilterName3('')}
-                aria-label="Clear name filter 3"
-                title="Clear"
+                aria-label="Очистить фильтр названия 3"
+                title="Очистить"
               >
                 ✕
               </button>
@@ -477,7 +473,7 @@ export function ProductSearchPanel({
               <div className="search-field-with-clear search-field-with-clear--filter-num">
                 <input
                   type="number"
-                  placeholder="Price above (min)"
+                  placeholder="Цена от (мин.)"
                   value={priceAbove}
                   onChange={(e) => setPriceAbove(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -490,8 +486,8 @@ export function ProductSearchPanel({
                   className="search-field-clear"
                   disabled={!priceAbove.trim()}
                   onClick={() => setPriceAbove('')}
-                  aria-label="Clear min price"
-                  title="Clear"
+                  aria-label="Очистить мин. цену"
+                  title="Очистить"
                 >
                   ✕
                 </button>
@@ -499,7 +495,7 @@ export function ProductSearchPanel({
               <div className="search-field-with-clear search-field-with-clear--filter-num">
                 <input
                   type="number"
-                  placeholder="Price below (max)"
+                  placeholder="Цена до (макс.)"
                   value={priceBelow}
                   onChange={(e) => setPriceBelow(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -512,8 +508,8 @@ export function ProductSearchPanel({
                   className="search-field-clear"
                   disabled={!priceBelow.trim()}
                   onClick={() => setPriceBelow('')}
-                  aria-label="Clear max price"
-                  title="Clear"
+                  aria-label="Очистить макс. цену"
+                  title="Очистить"
                 >
                   ✕
                 </button>
@@ -528,15 +524,10 @@ export function ProductSearchPanel({
                   className="btn-add-all"
                   onClick={() => void handleAddAll()}
                   disabled={addBlocked || filteredSearchResults.length === 0}
-                  title="Adds only products already shown in this list. If more search pages exist, the next page loads automatically after adding."
+                  title="Добавляет только товары, уже показанные в этом списке. Если на сервере есть ещё страницы, следующая страница загрузится автоматически."
                 >
                   {addAllLabel}
                 </button>
-                {searchHasMore && filteredSearchResults.length > 0 && (
-                  <p className="muted search-add-all-hint">
-                    Only loaded rows are added; the next page loads after add all when more exist. Scroll for further pages.
-                  </p>
-                )}
               </div>
               <div className="search-results" ref={searchResultsRef} onScroll={handleSearchResultsScroll}>
                 {filteredSearchResults.map((p) => (
@@ -568,21 +559,21 @@ export function ProductSearchPanel({
                       disabled={addBlocked}
                       title={addOneTitle}
                     >
-                      + Add
+                      + Добавить
                     </button>
                   </div>
                 ))}
                 {searchHasMore && (
                   <div className="search-load-more">
                     {searchLoadingMore ? (
-                      <span className="muted">Loading…</span>
+                      <span className="muted">Загрузка…</span>
                     ) : (
-                      <span className="muted">Scroll for more</span>
+                      <span className="muted">Прокрутите для загрузки</span>
                     )}
                   </div>
                 )}
                 {filteredSearchResults.length === 0 && searchResults.length > 0 && (
-                  <p className="muted">No matches for filter or all are already in the {alreadyInPhrase}.</p>
+                  <p className="muted">Нет совпадений по фильтру, либо всё уже есть в {alreadyInPhrase}.</p>
                 )}
               </div>
             </>

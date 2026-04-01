@@ -28,7 +28,7 @@ export type UserListEditorOptions = {
 
 export function useUserListEditor(token: string | null, options: UserListEditorOptions) {
   const { listKind } = options;
-  const defaultListName = listKind === 'graph' ? 'My graph' : 'My table';
+  const defaultListName = listKind === 'graph' ? 'график 1' : 'таблица 1';
   const selectedListStorageKey = `list-editor:selected-list:${listKind}`;
 
   const [lists, setLists] = useState<UserList[]>([]);
@@ -256,7 +256,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
         setLists(L);
       }
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Save failed');
+      window.alert(e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
       setTableToolsBusy(false);
     }
@@ -264,8 +264,8 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
 
   const handleDeleteTable = async () => {
     if (!token || !currentListId) return;
-    const label = lists.find((l) => l.id === currentListId)?.name ?? 'this list';
-    if (!window.confirm(`Delete “${label}”?`)) return;
+    const label = lists.find((l) => l.id === currentListId)?.name ?? 'этот список';
+    if (!window.confirm(`Удалить «${label}»?`)) return;
     setTableToolsBusy(true);
     setPendingItems(null);
     try {
@@ -284,7 +284,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       setLists(L);
       setCurrentListId((prev) => (prev === id ? L[0]?.id ?? null : prev));
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Delete failed');
+      window.alert(e instanceof Error ? e.message : 'Не удалось удалить');
     } finally {
       setTableToolsBusy(false);
     }

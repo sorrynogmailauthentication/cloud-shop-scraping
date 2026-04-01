@@ -35,21 +35,21 @@ export default function Layout() {
 
   const subscriptionLabel = hasAccess
     ? !user?.accessUntil
-      ? 'Unlimited subscription'
-      : `Subscription ends ${user.accessUntil}`
+      ? 'Подписка без ограничений'
+      : `Подписка до ${user.accessUntil}`
     : null;
 
   return (
     <div className="layout">
       <header className="header">
         <div className="header-inner">
-          <span className="logo">Cloud Shop</span>
+          <span className="logo">Ценалитика</span>
           <nav className="header-nav">
             <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')} end>
-              Table
+              Таблица
             </NavLink>
             <NavLink to="/graph" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}>
-              Graph
+              График
             </NavLink>
           </nav>
           <div className="header-user">
@@ -58,7 +58,7 @@ export default function Layout() {
             )}
             <span className="user-name">{user?.displayName || user?.login}</span>
             <button type="button" className="btn-logout" onClick={logout}>
-              Log out
+              Выйти
             </button>
           </div>
         </div>

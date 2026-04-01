@@ -44,13 +44,13 @@ export default function AdminPanel() {
         return;
       }
       if (!res.ok) {
-        setError('Failed to load users');
+        setError('Не удалось загрузить пользователей');
         return;
       }
       const data = await res.json();
       setUsers(data.users || []);
     } catch {
-      setError('Network error');
+      setError('Ошибка сети');
     } finally {
       setLoading(false);
     }
@@ -120,29 +120,29 @@ export default function AdminPanel() {
   return (
     <div className="admin-panel">
       <header className="admin-header">
-        <span className="logo">Admin</span>
+        <span className="logo">Админ</span>
         <div className="admin-header-actions">
-          <Link to="/" className="btn-home">Home</Link>
+          <Link to="/" className="btn-home">На главную</Link>
           <button type="button" className="btn-logout" onClick={handleLogout}>
-            Log out
+            Выйти
           </button>
         </div>
       </header>
       <main className="admin-content">
-        <h2>Users</h2>
+        <h2>Пользователи</h2>
         {error && <div className="login-error">{error}</div>}
         {loading ? (
-          <p className="muted">Loading…</p>
+          <p className="muted">Загрузка…</p>
         ) : (
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Email</th>
-                  <th>Date created</th>
-                  <th>Display name</th>
-                  <th>Paid</th>
-                  <th>Access until</th>
+                  <th>Почта</th>
+                  <th>Дата создания</th>
+                  <th>Имя</th>
+                  <th>Оплачено</th>
+                  <th>Доступ до</th>
                 </tr>
               </thead>
               <tbody>

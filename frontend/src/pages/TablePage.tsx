@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
@@ -127,10 +127,10 @@ export default function TablePage() {
   if (!user?.isPaid) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Please wait for admin confirmation</h2>
+        <h2>Ожидайте подтверждения от администратора</h2>
         <p className="muted">
-          Your account (<strong>{user?.displayName || user?.login}</strong>
-          {user?.email && ` — ${user.email}`}) is pending.
+          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>
+          {user?.email && ` — ${user.email}`}) ожидает подтверждения.
         </p>
       </main>
     );
@@ -138,15 +138,15 @@ export default function TablePage() {
   if (!hasAccess && user.accessUntil) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Access expired</h2>
-        <p className="muted">Your access ended on <strong>{user.accessUntil}</strong>.</p>
+        <h2>Доступ истек</h2>
+        <p className="muted">Ваш доступ завершился <strong>{user.accessUntil}</strong>.</p>
       </main>
     );
   }
 
   return (
     <main className="dashboard table-page">
-      <h2>Table</h2>
+      <h2>Таблица</h2>
       <TableContent token={token} />
     </main>
   );
@@ -436,7 +436,7 @@ function TableContent({ token }: { token: string | null }) {
   }, [sortedTableItems]);
 
   const handleTableRowMouseDown = useCallback(
-    (e: MouseEvent, index: number) => {
+    (e: ReactMouseEvent, index: number) => {
       if (e.button !== 0) return;
       const t = e.target as HTMLElement;
       if (t.closest('button, a')) return;
@@ -505,7 +505,7 @@ function TableContent({ token }: { token: string | null }) {
         <div className="table-toolbar-wrap">
           <div className="table-toolbar">
             <label className="table-toolbar-field">
-              <span className="table-toolbar-label">Table</span>
+              <span className="table-toolbar-label">Таблица</span>
               <select
                 className="list-select table-toolbar-select"
                 value={currentListId ?? ''}
@@ -513,7 +513,7 @@ function TableContent({ token }: { token: string | null }) {
                 disabled={lists.length === 0 || tableToolsBusy}
               >
                 {lists.length === 0 ? (
-                  <option value="">No tables</option>
+                  <option value="">Нет таблиц</option>
                 ) : (
                   lists.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -524,13 +524,13 @@ function TableContent({ token }: { token: string | null }) {
               </select>
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">
-              <span className="table-toolbar-label">Name</span>
+              <span className="table-toolbar-label">Название</span>
               <input
                 type="text"
                 className="search-input table-toolbar-name"
                 value={saveTableName}
                 onChange={(e) => setSaveTableName(e.target.value)}
-                placeholder="My table"
+                placeholder="таблица 1"
                 disabled={tableToolsBusy}
                 autoComplete="off"
               />
@@ -542,7 +542,7 @@ function TableContent({ token }: { token: string | null }) {
                 disabled={tableToolsBusy || !saveTableName.trim()}
                 onClick={() => void handleSaveTableCopy()}
               >
-                Save
+                Сохранить
               </button>
               <button
                 type="button"
@@ -550,23 +550,23 @@ function TableContent({ token }: { token: string | null }) {
                 disabled={tableToolsBusy || !currentListId}
                 onClick={() => void handleDeleteTable()}
               >
-                Delete
+                Удалить
               </button>
               {currentListId && (
                 <button type="button" className="btn-clear-table" onClick={handleClearTable} disabled={tableToolsBusy}>
-                  Clear rows
+                  Очистить строки
                 </button>
               )}
             </div>
           </div>
         </div>
         {pendingItems !== null && (
-          <p className="widget-hint">Unsaved row changes — click Save to write them to the server.</p>
+          <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
         )}
         {!currentListId && lists.length === 0 && (
-          <p className="widget-hint muted">Loading your table…</p>
+          <p className="widget-hint muted">Загрузка вашей таблицы…</p>
         )}
-        {listLoading && <p className="muted">Loading…</p>}
+        {listLoading && <p className="muted">Загрузка…</p>}
         {listWithItems && !listLoading && displayItems.length > 0 && (
           <DateRangeSlicerPanel
             timelineMax={timelineMax}
@@ -590,10 +590,10 @@ function TableContent({ token }: { token: string | null }) {
                     sort={tableSort}
                     onSort={cycleTableSort}
                   >
-                    Product
+                    Товар
                   </SortableTh>
                   <SortableTh columnKey="link" sort={tableSort} onSort={cycleTableSort}>
-                    Link
+                    Ссылка
                   </SortableTh>
                   <SortableTh
                     columnKey="shop"
@@ -601,7 +601,7 @@ function TableContent({ token }: { token: string | null }) {
                     onSort={cycleTableSort}
                     className="table-col-shop"
                   >
-                    Shop
+                    Магазин
                   </SortableTh>
                   <SortableTh
                     columnKey="category"
@@ -609,16 +609,16 @@ function TableContent({ token }: { token: string | null }) {
                     onSort={cycleTableSort}
                     className="table-col-category"
                   >
-                    Category
+                    Категория
                   </SortableTh>
                   <SortableTh
                     columnKey="atStart"
                     sort={tableSort}
                     onSort={cycleTableSort}
                     className="table-col-num"
-                    title={`Closest price to ${fromDateLabel}`}
+                    title={`Ближайшая цена к ${fromDateLabel}`}
                   >
-                    <abbr title={`Closest price to ${fromDateLabel}`}>Start price</abbr>
+                    <abbr title={`Ближайшая цена к ${fromDateLabel}`}>Цена, начало</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="price"
@@ -626,7 +626,7 @@ function TableContent({ token }: { token: string | null }) {
                     onSort={cycleTableSort}
                     className="table-col-num"
                   >
-                    <abbr title={`Closest price to ${toDateLabel}`}>End price</abbr>
+                    <abbr title={`Ближайшая цена к ${toDateLabel}`}>Цена, конец</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="beforeDiscount"
@@ -634,7 +634,7 @@ function TableContent({ token }: { token: string | null }) {
                     onSort={cycleTableSort}
                     className="table-col-num"
                   >
-                    Before discount
+                    До скидки
                   </SortableTh>
                   <SortableTh
                     columnKey="discountPct"
@@ -642,27 +642,27 @@ function TableContent({ token }: { token: string | null }) {
                     onSort={cycleTableSort}
                     className="table-col-pct"
                   >
-                    Discount %
+                    Скидка %
                   </SortableTh>
                   <SortableTh
                     columnKey="deltaPrice"
                     sort={tableSort}
                     onSort={cycleTableSort}
                     className="table-col-num"
-                    title={`Price change, ${fromDateLabel} → ${toDateLabel}`}
+                    title={`Изменение цены, ${fromDateLabel} → ${toDateLabel}`}
                   >
-                    <abbr title={`Price change, ${fromDateLabel} → ${toDateLabel}`}>Δ price</abbr>
+                    <abbr title={`Изменение цены, ${fromDateLabel} → ${toDateLabel}`}>Δ цена</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="deltaPct"
                     sort={tableSort}
                     onSort={cycleTableSort}
                     className="table-col-pct"
-                    title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}
+                    title={`Процентное изменение, ${fromDateLabel} → ${toDateLabel}`}
                   >
-                    <abbr title={`Percent change, ${fromDateLabel} → ${toDateLabel}`}>Δ %</abbr>
+                    <abbr title={`Процентное изменение, ${fromDateLabel} → ${toDateLabel}`}>Δ %</abbr>
                   </SortableTh>
-                  <th className="sort-th--narrow" aria-label="Remove" />
+                  <th className="sort-th--narrow" aria-label="Удалить" />
                 </tr>
               </thead>
               <tbody>
@@ -693,7 +693,7 @@ function TableContent({ token }: { token: string | null }) {
                           className="table-link"
                           onMouseDown={(e) => e.stopPropagation()}
                         >
-                          Link
+                          Ссылка
                         </a>
                       </td>
                       <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>
@@ -744,8 +744,8 @@ function TableContent({ token }: { token: string | null }) {
                           }}
                           title={
                             selectedUrls.has(item.product_url) && selectedUrls.size > 1
-                              ? 'Remove all selected rows'
-                              : 'Remove from table'
+                              ? 'Удалить все выбранные строки'
+                              : 'Удалить из таблицы'
                           }
                         >
                           ✕
@@ -757,7 +757,7 @@ function TableContent({ token }: { token: string | null }) {
               </tbody>
             </table>
             {displayItems.length === 0 && (
-              <p className="muted table-empty">No items. Add from search above.</p>
+              <p className="muted table-empty">Нет элементов. Добавьте их через поиск выше.</p>
             )}
           </div>
         )}

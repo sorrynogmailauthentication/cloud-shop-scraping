@@ -55,7 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (e) {
       setUser(null);
-      setError(e instanceof Error ? e.message : 'Unknown error');
+      setError(e instanceof Error ? e.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
     }

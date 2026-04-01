@@ -52,10 +52,10 @@ export default function Dashboard() {
   if (!user?.isPaid) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Please wait for admin confirmation</h2>
+        <h2>Ожидайте подтверждения от администратора</h2>
         <p className="muted">
-          Your account (<strong>{user?.displayName || user?.login}</strong>
-          {user?.email && ` — ${user.email}`}) is pending. You will see the dashboard once an admin has confirmed access.
+          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>
+          {user?.email && ` — ${user.email}`}) ожидает подтверждения. Дашборд станет доступен после подтверждения администратором.
         </p>
       </main>
     );
@@ -64,9 +64,9 @@ export default function Dashboard() {
   if (!hasAccess && user.accessUntil) {
     return (
       <main className="dashboard dashboard-waiting">
-        <h2>Access expired</h2>
+        <h2>Доступ истек</h2>
         <p className="muted">
-          Your dashboard access ended on <strong>{user.accessUntil}</strong>. Contact an admin to extend access.
+          Ваш доступ к дашборду завершился <strong>{user.accessUntil}</strong>. Обратитесь к администратору для продления.
         </p>
       </main>
     );
@@ -74,9 +74,9 @@ export default function Dashboard() {
 
   return (
     <main className="dashboard">
-      <h2>Dashboard</h2>
+      <h2>Дашборд</h2>
       <p className="muted">
-        Logged in as <strong>{user?.displayName || user?.login}</strong>
+        Вы вошли как <strong>{user?.displayName || user?.login}</strong>
         {user?.email && ` (${user.email})`}.
       </p>
       <DashboardContent token={token} />
@@ -147,7 +147,7 @@ function DashboardContent({ token }: { token: string | null }) {
   const ensureDefaultList = useCallback(async () => {
     if (!token || lists.length > 0) return lists[0]?.id ?? null;
     try {
-      const { list } = await createList(token, 'My table', null, 'table');
+      const { list } = await createList(token, 'таблица 1', null, 'table');
       setLists((prev) => [...prev, list]);
       setCurrentListId(list.id);
       return list.id;
@@ -169,7 +169,7 @@ function DashboardContent({ token }: { token: string | null }) {
       });
       setSearchResults(products);
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : 'Search failed');
+      setSearchError(e instanceof Error ? e.message : 'Ошибка поиска');
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
@@ -279,12 +279,12 @@ function DashboardContent({ token }: { token: string | null }) {
   return (
     <div className="dashboard-grid">
       <section className="dashboard-widget search-widget">
-        <h3>Search products</h3>
-        <p className="widget-hint">By name, link (URL), category, or shop</p>
+        <h3>Поиск товаров</h3>
+        <p className="widget-hint">По названию, ссылке (URL), категории или магазину</p>
         <div className="search-form">
           <input
             type="text"
-            placeholder="Name (partial)"
+            placeholder="Название (часть)"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -292,7 +292,7 @@ function DashboardContent({ token }: { token: string | null }) {
           />
           <input
             type="text"
-            placeholder="URL (partial)"
+            placeholder="Ссылка (часть)"
             value={searchUrl}
             onChange={(e) => setSearchUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -300,7 +300,7 @@ function DashboardContent({ token }: { token: string | null }) {
           />
           <input
             type="text"
-            placeholder="Category"
+            placeholder="Категория"
             value={searchCategory}
             onChange={(e) => setSearchCategory(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
@@ -308,21 +308,21 @@ function DashboardContent({ token }: { token: string | null }) {
           />
           <input
             type="text"
-            placeholder="Shop"
+            placeholder="Магазин"
             value={searchShop}
             onChange={(e) => setSearchShop(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
             className="search-input"
           />
           <button type="button" className="btn-primary btn-search" onClick={runSearch} disabled={searchLoading}>
-            {searchLoading ? 'Searching…' : 'Search'}
+            {searchLoading ? 'Поиск…' : 'Поиск'}
           </button>
         </div>
         {searchError && <div className="widget-error">{searchError}</div>}
         {searchResults.length > 0 && (
           <div className="search-actions">
             <button type="button" className="btn-add-all" onClick={addAllToTable}>
-              Add all to table
+              Добавить всё в таблицу
             </button>
           </div>
         )}
@@ -334,17 +334,17 @@ function DashboardContent({ token }: { token: string | null }) {
                 {p.price != null ? formatPriceDisplay(p.price) : '—'}
                 {p.discount_pct != null && ` (−${p.discount_pct}%)`}
               </span>
-              <button type="button" className="btn-add-one" onClick={() => addOneToTable(p)} title="Add to table">
-                + Add
+              <button type="button" className="btn-add-one" onClick={() => addOneToTable(p)} title="Добавить в таблицу">
+                + Добавить
               </button>
             </div>
           ))}
-          {searchResults.length > 30 && <p className="muted">… and {searchResults.length - 30} more</p>}
+          {searchResults.length > 30 && <p className="muted">… и еще {searchResults.length - 30}</p>}
         </div>
       </section>
 
       <section className="dashboard-widget table-widget">
-        <h3>My table</h3>
+        <h3>Моя таблица</h3>
         {lists.length > 0 && (
           <select
             className="list-select"
@@ -359,19 +359,19 @@ function DashboardContent({ token }: { token: string | null }) {
           </select>
         )}
         {!currentListId && lists.length === 0 && (
-          <p className="widget-hint">Search and &quot;Add all&quot; or &quot;+ Add&quot; to create and fill your first list.</p>
+          <p className="widget-hint">Найдите товары и нажмите &quot;Добавить всё&quot; или &quot;+ Добавить&quot;, чтобы создать и заполнить первый список.</p>
         )}
-        {listLoading && <p className="muted">Loading…</p>}
+        {listLoading && <p className="muted">Загрузка…</p>}
         {listWithItems && !listLoading && (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Product</th>
-                  <th>Link</th>
-                  <th>Price</th>
-                  <th>Before discount</th>
-                  <th>Discount %</th>
+                  <th>Товар</th>
+                  <th>Ссылка</th>
+                  <th>Цена</th>
+                  <th>До скидки</th>
+                  <th>Скидка %</th>
                   <th></th>
                 </tr>
               </thead>
@@ -381,7 +381,7 @@ function DashboardContent({ token }: { token: string | null }) {
                     <td>{obscureProductDisplayName(item.product?.product_name, item.product_url)}</td>
                     <td>
                       <a href={item.product_url} target="_blank" rel="noopener noreferrer" className="table-link">
-                        Link
+                        Ссылка
                       </a>
                     </td>
                     <td>
@@ -398,7 +398,7 @@ function DashboardContent({ token }: { token: string | null }) {
                         type="button"
                         className="btn-remove"
                         onClick={() => removeFromTable(item.product_url)}
-                        title="Remove from table"
+                        title="Удалить из таблицы"
                       >
                         ✕
                       </button>
@@ -408,35 +408,35 @@ function DashboardContent({ token }: { token: string | null }) {
               </tbody>
             </table>
             {listWithItems.items.length === 0 && (
-              <p className="muted table-empty">No items. Add from search above.</p>
+              <p className="muted table-empty">Нет элементов. Добавьте их через поиск выше.</p>
             )}
           </div>
         )}
       </section>
 
       <section className="dashboard-widget chart-widget">
-        <h3>Price history</h3>
+        <h3>История цен</h3>
         <div className="chart-controls">
           <select
             className="range-select"
             value={chartRange}
             onChange={(e) => setChartRange(e.target.value as '7d' | '14d' | '30d')}
           >
-            <option value="7d">7 days</option>
-            <option value="14d">14 days</option>
-            <option value="30d">30 days</option>
+            <option value="7d">7 дней</option>
+            <option value="14d">14 дней</option>
+            <option value="30d">30 дней</option>
           </select>
           <div className="chart-search">
             <input
               type="text"
-              placeholder="Search product to add to graph…"
+              placeholder="Найти товар для добавления в график…"
               value={chartSearchQ}
               onChange={(e) => setChartSearchQ(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runChartSearch()}
               className="search-input"
             />
             <button type="button" className="btn-primary btn-search" onClick={runChartSearch}>
-              Search
+              Поиск
             </button>
           </div>
         </div>
@@ -446,7 +446,7 @@ function DashboardContent({ token }: { token: string | null }) {
               <li key={p.url}>
                 <span>{obscureProductDisplayName(p.product_name, p.url)}</span>
                 <button type="button" className="btn-add-one" onClick={() => addProductToChart(p)}>
-                  Add to graph
+                  Добавить в график
                 </button>
               </li>
             ))}
@@ -462,7 +462,7 @@ function DashboardContent({ token }: { token: string | null }) {
             </span>
           ))}
         </div>
-        {chartLoading && <p className="muted">Loading chart…</p>}
+        {chartLoading && <p className="muted">Загрузка графика…</p>}
         {chartData.length > 0 && !chartLoading && (
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={640}>
@@ -499,7 +499,7 @@ function DashboardContent({ token }: { token: string | null }) {
           </div>
         )}
         {chartProducts.length === 0 && !chartLoading && (
-          <p className="widget-hint">Search and add products to see price history.</p>
+          <p className="widget-hint">Найдите и добавьте товары, чтобы увидеть историю цен.</p>
         )}
       </section>
     </div>

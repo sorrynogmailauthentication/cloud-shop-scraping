@@ -27,7 +27,7 @@ export function DateRangeSlicerPanel({
   return (
     <div className="date-range-slicer-panel">
       <div className="date-range-slicer-panel-head">
-        <span className="date-range-slicer-title">Date range</span>
+        <span className="date-range-slicer-title">Период дат</span>
         <span className="date-range-slicer-selection" aria-live="polite">
           <time dateTime={fromYmd}>{fromDateLabel}</time>
           <span className="date-range-slicer-arrow" aria-hidden>
@@ -62,7 +62,7 @@ export function DateRangeSlicerPanel({
             const n = Math.round(Number(e.target.value));
             setDateRange((prev) => enforceTimelineGap(n, prev.end, timelineMax));
           }}
-          aria-label={`Start of range, ${fromDateLabel}`}
+          aria-label={`Начало периода, ${fromDateLabel}`}
         />
         <input
           type="range"
@@ -74,16 +74,16 @@ export function DateRangeSlicerPanel({
             const n = Math.round(Number(e.target.value));
             setDateRange((prev) => enforceTimelineGap(prev.start, n, timelineMax));
           }}
-          aria-label={`End of range, ${toDateLabel}`}
+          aria-label={`Конец периода, ${toDateLabel}`}
         />
       </div>
       <div className="date-range-slicer-ticks">
         <div className="date-range-slicer-tick">
-          <span className="date-range-slicer-tick-role">Start</span>
+          <span className="date-range-slicer-tick-role">Начало</span>
           <time dateTime={fromYmd}>{fromDateLabel}</time>
         </div>
         <div className="date-range-slicer-tick">
-          <span className="date-range-slicer-tick-role">End</span>
+          <span className="date-range-slicer-tick-role">Конец</span>
           <time dateTime={toYmd}>{toDateLabel}</time>
         </div>
       </div>

@@ -15,6 +15,8 @@ import type { PricePoint, UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
+import type PptxGenJS_Types from 'pptxgenjs';
 import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import {
@@ -424,7 +426,7 @@ function GraphContent({ token }: { token: string | null }) {
 
   const lineDotFns = useMemo(
     () =>
-      displayItems.map((item, i) =>
+      displayItems.map((item) =>
         lineDotRenderer(
           obscureProductDisplayName(item.product?.product_name, item.product_url),
           chartColorForProductUrl(item.product_url),
@@ -529,14 +531,15 @@ function GraphContent({ token }: { token: string | null }) {
         fontSize: 16,
       });
 
-      const rows: string[][] = [
-        ['Товар', 'Магазин', 'Цена', 'До скидки', '%'],
+      const toCell = (text: string): PptxGenJS_Types.TableCell => ({ text });
+      const rows: PptxGenJS_Types.TableRow[] = [
+        ['Товар', 'Магазин', 'Цена', 'До скидки', '%'].map(toCell),
         ...sortedSnapshotRows.slice(0, 24).map(({ item, price, priceBeforeDiscount, discountPct }) => [
-          item.product?.product_name || item.product_url,
-          item.product?.shop ?? '—',
-          price != null ? formatPriceDisplay(price) : '—',
-          priceBeforeDiscount != null ? formatPriceDisplay(priceBeforeDiscount) : '—',
-          discountPct != null ? `${discountPct}%` : '—',
+          toCell(item.product?.product_name || item.product_url),
+          toCell(item.product?.shop ?? '—'),
+          toCell(price != null ? formatPriceDisplay(price) : '—'),
+          toCell(priceBeforeDiscount != null ? formatPriceDisplay(priceBeforeDiscount) : '—'),
+          toCell(discountPct != null ? `${discountPct}%` : '—'),
         ]),
       ];
 
@@ -548,7 +551,7 @@ function GraphContent({ token }: { token: string | null }) {
         fontSize: 9,
         color: 'E6EDF3',
         border: { pt: 1, color: '2D3A4F' },
-        fill: '1A2332',
+        fill: { color: '1A2332' },
         valign: 'middle',
         colW: [6.2, 2.1, 1.2, 1.3, 1.2],
       });
@@ -581,22 +584,14 @@ function GraphContent({ token }: { token: string | null }) {
           <div className="table-toolbar">
             <label className="table-toolbar-field">
               <span className="table-toolbar-label">График</span>
-              <select
-                className="list-select table-toolbar-select"
-                value={currentListId ?? ''}
-                onChange={(e) => setCurrentListId(e.target.value || null)}
+              <SingleSelectDropdown
+                options={lists.map((l) => ({ value: l.id, label: l.name }))}
+                value={currentListId}
+                placeholder={lists.length === 0 ? 'Нет сохраненных графиков' : 'Выберите график'}
                 disabled={lists.length === 0 || tableToolsBusy}
-              >
-                {lists.length === 0 ? (
-                  <option value="">Нет сохраненных графиков</option>
-                ) : (
-                  lists.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(nextId) => setCurrentListId(nextId)}
+                ariaLabel="Выбор графика"
+              />
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">
               <span className="table-toolbar-label">Название</span>

@@ -159,12 +159,14 @@ function DashboardContent({ token }: { token: string | null }) {
   const runSearch = async () => {
     setSearchError('');
     setSearchLoading(true);
+    const category = searchCategory.trim();
+    const shop = searchShop.trim();
     try {
       const { products } = await searchProducts(token, {
         q: searchQ || undefined,
         url: searchUrl || undefined,
-        category: searchCategory || undefined,
-        shop: searchShop || undefined,
+        shops: shop ? [shop] : undefined,
+        pairs: shop && category ? [{ shop, category }] : undefined,
         limit: 100,
       });
       setSearchResults(products);

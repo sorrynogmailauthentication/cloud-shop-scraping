@@ -1270,6 +1270,21 @@ html {
   padding: 0 0.75rem;
   line-height: calc(var(--search-control-height) - 2px);
 }
+
+/* Toolbar single-select dropdown should visually match the search panel dropdowns. */
+.table-toolbar .table-toolbar-dropdown-wrap {
+  width: 100%;
+  min-width: 0;
+}
+.table-toolbar .table-toolbar-dropdown-wrap .search-dropdown-trigger {
+  width: 100%;
+  min-width: 0;
+  height: var(--search-control-height);
+  min-height: var(--search-control-height);
+}
+.table-toolbar .table-toolbar-dropdown-wrap .search-dropdown-panel {
+  max-height: 220px;
+}
 .table-toolbar-select:hover,
 .table-toolbar .table-toolbar-name.search-input:hover {
   border-color: var(--muted);

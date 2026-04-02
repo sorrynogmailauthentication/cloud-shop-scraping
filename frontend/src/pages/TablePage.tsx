@@ -5,6 +5,7 @@ import type { UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
 import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import type { PricePoint } from '../types/dashboard';
@@ -564,22 +565,14 @@ function TableContent({ token }: { token: string | null }) {
           <div className="table-toolbar">
             <label className="table-toolbar-field">
               <span className="table-toolbar-label">Таблица</span>
-              <select
-                className="list-select table-toolbar-select"
-                value={currentListId ?? ''}
-                onChange={(e) => setCurrentListId(e.target.value || null)}
+              <SingleSelectDropdown
+                options={lists.map((l) => ({ value: l.id, label: l.name }))}
+                value={currentListId}
+                placeholder={lists.length === 0 ? 'Нет таблиц' : 'Выберите таблицу'}
                 disabled={lists.length === 0 || tableToolsBusy}
-              >
-                {lists.length === 0 ? (
-                  <option value="">Нет таблиц</option>
-                ) : (
-                  lists.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(nextId) => setCurrentListId(nextId)}
+                ariaLabel="Выбор таблицы"
+              />
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">
               <span className="table-toolbar-label">Название</span>

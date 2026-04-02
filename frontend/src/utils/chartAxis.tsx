@@ -33,7 +33,7 @@ export function YAxisTickHideTopLabel(props: YAxisTickContentProps): ReactElemen
     <Text
       {...props}
       fill={props.fill ?? 'var(--muted)'}
-      fontSize={props.fontSize ?? 11}
+      fontSize={11}
       className="recharts-cartesian-axis-tick-value"
     >
       {text}

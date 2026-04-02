@@ -5,6 +5,7 @@ import type { ProductWithPrice } from '../types/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
 
 const SEARCH_PAGE_SIZE = 20;
+const MIN_FILTERED_RESULTS = 5;
 
 export type ProductSearchPanelProps = {
   token: string | null;
@@ -165,18 +166,6 @@ export function ProductSearchPanel({
     return list;
   }, [searchResults, existingUrls, resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]);
 
-  const hasClientResultFilters = useMemo(
-    () =>
-      Boolean(
-        resultFilterName1.trim() ||
-        resultFilterName2.trim() ||
-        resultFilterName3.trim() ||
-        priceAbove.trim() ||
-        priceBelow.trim()
-      ),
-    [resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]
-  );
-
   const handleSearchResultsScroll = useCallback(() => {
     const el = searchResultsRef.current;
     if (!el || searchLoadingMore || !searchHasMore) return;
@@ -187,21 +176,13 @@ export function ProductSearchPanel({
   }, [loadMoreSearch, searchLoadingMore, searchHasMore]);
 
   useEffect(() => {
-    // If all currently loaded rows are already in the list, the panel can become non-scrollable,
-    // so onScroll will never fire. Auto-load the next page in this narrow case.
+    // When client-side filtering (name/price/existingUrls) leaves too few items,
+    // prefetch additional pages so the panel isn't empty/near-empty.
     if (searchLoading || searchLoadingMore || !searchHasMore) return;
-    if (searchResults.length === 0 || filteredSearchResults.length > 0) return;
-    if (hasClientResultFilters) return;
+    if (searchResults.length === 0) return;
+    if (filteredSearchResults.length >= MIN_FILTERED_RESULTS) return;
     void loadMoreSearch();
-  }, [
-    searchLoading,
-    searchLoadingMore,
-    searchHasMore,
-    searchResults.length,
-    filteredSearchResults.length,
-    hasClientResultFilters,
-    loadMoreSearch,
-  ]);
+  }, [searchLoading, searchLoadingMore, searchHasMore, searchResults.length, filteredSearchResults.length, loadMoreSearch]);
 
   const handleAddAll = async () => {
     const toAdd = filteredSearchResults.slice();

@@ -563,7 +563,7 @@ function TableContent({ token }: { token: string | null }) {
       <section className="table-section">
         <div className="table-toolbar-wrap">
           <div className="table-toolbar">
-            <label className="table-toolbar-field">
+            <label className="table-toolbar-field table-toolbar-field--grow">
               <span className="table-toolbar-label">Таблица</span>
               <SingleSelectDropdown
                 options={lists.map((l) => ({ value: l.id, label: l.name }))}

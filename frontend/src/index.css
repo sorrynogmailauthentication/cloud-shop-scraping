@@ -412,6 +412,17 @@ html {
   width: 7rem;
   min-width: 7rem;
 }
+
+/* Hide browser number input spinner arrows (we already have clear button). */
+.search-input-num {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.search-input-num::-webkit-outer-spin-button,
+.search-input-num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .search-input-url {
   flex: 0 1 15.75rem;
   min-width: 10.5rem;

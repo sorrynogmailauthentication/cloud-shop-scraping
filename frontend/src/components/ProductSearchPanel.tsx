@@ -43,6 +43,7 @@ export function ProductSearchPanel({
   const [resultFilterName1, setResultFilterName1] = useState('');
   const [resultFilterName2, setResultFilterName2] = useState('');
   const [resultFilterName3, setResultFilterName3] = useState('');
+  const [resultNegFilterName1, setResultNegFilterName1] = useState('');
   const [searchResults, setSearchResults] = useState<ProductWithPrice[]>([]);
   const [searchHasMore, setSearchHasMore] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -159,12 +160,21 @@ export function ProductSearchPanel({
         return nameNeedles.every((n) => hay.includes(n));
       });
     }
+    const negNameNeedles = [resultNegFilterName1]
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (negNameNeedles.length > 0) {
+      list = list.filter((p) => {
+        const hay = (p.product_name ?? '').toLowerCase();
+        return negNameNeedles.every((n) => !hay.includes(n));
+      });
+    }
     const minP = priceAbove.trim() ? parseFloat(priceAbove) : null;
     const maxP = priceBelow.trim() ? parseFloat(priceBelow) : null;
     if (Number.isFinite(minP)) list = list.filter((p) => p.price != null && p.price >= minP!);
     if (Number.isFinite(maxP)) list = list.filter((p) => p.price != null && p.price <= maxP!);
     return list;
-  }, [searchResults, existingUrls, resultFilterName1, resultFilterName2, resultFilterName3, priceAbove, priceBelow]);
+  }, [searchResults, existingUrls, resultFilterName1, resultFilterName2, resultFilterName3, resultNegFilterName1, priceAbove, priceBelow]);
 
   const handleSearchResultsScroll = useCallback(() => {
     const el = searchResultsRef.current;
@@ -476,6 +486,25 @@ export function ProductSearchPanel({
                 disabled={!resultFilterName3.trim()}
                 onClick={() => setResultFilterName3('')}
                 aria-label="Очистить фильтр названия 3"
+                title="Очистить"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="search-field-with-clear search-field-with-clear--filter-text">
+              <input
+                type="text"
+                placeholder="Название не содержит (1)"
+                value={resultNegFilterName1}
+                onChange={(e) => setResultNegFilterName1(e.target.value)}
+                className="search-input search-filter-text"
+              />
+              <button
+                type="button"
+                className="search-field-clear"
+                disabled={!resultNegFilterName1.trim()}
+                onClick={() => setResultNegFilterName1('')}
+                aria-label="Очистить негативный фильтр названия 1"
                 title="Очистить"
               >
                 ✕

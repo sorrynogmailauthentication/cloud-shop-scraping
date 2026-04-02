@@ -1571,9 +1571,11 @@ html {
 .graph-snapshot-name {
   min-width: 0;
   font-size: 0.875rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .graph-snapshot-price,
 .graph-snapshot-before,

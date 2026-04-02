@@ -1,11 +1,14 @@
-/** Max visible length for product titles; extra characters are omitted (…). */
-export const PRODUCT_DISPLAY_NAME_MAX = 50;
+/**
+ * Product display name used across chart labels and UI blocks.
+ *
+ * IMPORTANT: we intentionally do NOT truncate here. Truncation makes it hard
+ * to read full product titles, and the UI already provides `title` tooltips.
+ */
 
 export function obscureProductDisplayName(
   productName: string | null | undefined,
   fallbackUrl: string
 ): string {
   const s = ((productName ?? '').trim() || fallbackUrl).trim();
-  if (s.length <= PRODUCT_DISPLAY_NAME_MAX) return s;
-  return s.slice(0, PRODUCT_DISPLAY_NAME_MAX) + '…';
+  return s;
 }

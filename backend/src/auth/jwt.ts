@@ -28,3 +28,12 @@ export interface AdminPayload {
 export function signAdminToken(): string {
   return jwt.sign({ admin: true } as AdminPayload, secret, { expiresIn: jwtExpiresIn });
 }
+
+export function verifyAdminToken(token: string): AdminPayload | null {
+  try {
+    const payload = jwt.verify(token, secret) as AdminPayload;
+    return payload?.admin === true ? payload : null;
+  } catch {
+    return null;
+  }
+}

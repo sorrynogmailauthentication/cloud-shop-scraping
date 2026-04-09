@@ -3,8 +3,8 @@ services:
     image: postgres:16-alpine
     environment:
       PGDATABASE: priceMonitor
-      PGUSER: ${PGUSER}
-      PGPASSWORD: ${PGPASSWORD}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro

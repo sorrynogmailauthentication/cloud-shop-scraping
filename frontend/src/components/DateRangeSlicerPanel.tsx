@@ -9,7 +9,6 @@ export type DateRangeSlicerPanelProps = {
   toYmd: string;
   fromDateLabel: string;
   toDateLabel: string;
-  loading?: boolean;
   error?: string | null;
 };
 
@@ -21,7 +20,6 @@ export function DateRangeSlicerPanel({
   toYmd,
   fromDateLabel,
   toDateLabel,
-  loading,
   error,
 }: DateRangeSlicerPanelProps) {
   return (
@@ -35,7 +33,6 @@ export function DateRangeSlicerPanel({
           </span>
           <time dateTime={toYmd}>{toDateLabel}</time>
         </span>
-        {loading && <span className="muted date-range-slicer-status">…</span>}
       </div>
       {error ? <div className="widget-error date-range-slicer-error">{error}</div> : null}
       <div className="date-range-slicer">

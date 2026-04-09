@@ -17,7 +17,7 @@ import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
 import type PptxGenJS_Types from 'pptxgenjs';
-import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
+import { useListMainPreservedHeight } from '../hooks/useListMainPreservedHeight';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import {
   TABLE_DATE_ANCHOR_YMD,
@@ -201,7 +201,7 @@ function GraphContent({ token }: { token: string | null }) {
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'graph' });
 
-  useKeepScrollOnListSwitch(currentListId, listLoading);
+  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() => {
@@ -302,7 +302,7 @@ function GraphContent({ token }: { token: string | null }) {
   };
 
   useEffect(() => {
-    if (!token || displayItems.length === 0) {
+    if (!token || displayItems.length === 0 || listLoading) {
       setChartData([]);
       setHistByUrl(new Map());
       setChartError('');
@@ -378,7 +378,7 @@ function GraphContent({ token }: { token: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [token, chartItemsKey, fromYmd, toYmd]);
+  }, [token, chartItemsKey, fromYmd, toYmd, listLoading]);
 
   useEffect(() => {
     setPointTip(null);
@@ -646,24 +646,32 @@ function GraphContent({ token }: { token: string | null }) {
         {!currentListId && lists.length === 0 && (
           <p className="widget-hint muted">Загрузка вашего графика…</p>
         )}
-        {listLoading && <p className="muted">Загрузка…</p>}
+        <div ref={mainBlockRef} className="list-main-data-block">
+          {listLoading ? (
+            <div
+              className="list-main-block-loading"
+              style={{ minHeight: loadingMinHeightPx }}
+              aria-busy
+            >
+              <p className="muted">Загрузка…</p>
+            </div>
+          ) : (
+            <>
+              {listWithItems && displayItems.length > 0 && (
+                <DateRangeSlicerPanel
+                  timelineMax={timelineMax}
+                  dateRange={dateRange}
+                  setDateRange={setDateRange}
+                  fromYmd={fromYmd}
+                  toYmd={toYmd}
+                  fromDateLabel={fromDateLabel}
+                  toDateLabel={toDateLabel}
+                  error={chartError || null}
+                />
+              )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && (
-          <DateRangeSlicerPanel
-            timelineMax={timelineMax}
-            dateRange={dateRange}
-            setDateRange={setDateRange}
-            fromYmd={fromYmd}
-            toYmd={toYmd}
-            fromDateLabel={fromDateLabel}
-            toDateLabel={toDateLabel}
-            loading={chartLoading}
-            error={chartError || null}
-          />
-        )}
-
-        {listWithItems && !listLoading && displayItems.length > 0 && (
-          <div className="graph-snapshot-panel">
+              {listWithItems && displayItems.length > 0 && (
+                <div className="graph-snapshot-panel">
             <div className="graph-snapshot-panel-head">
               <label className="graph-snapshot-date-field">
                 <span className="graph-snapshot-label">Цены на дату</span>
@@ -757,11 +765,11 @@ function GraphContent({ token }: { token: string | null }) {
             <p className="graph-snapshot-footnote muted">
               Если на выбранный день нет цены, показывается ближайшая доступная цена из истории (как на графике).
             </p>
-          </div>
-        )}
+                </div>
+              )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length > 0 && (
-          <div className="chart-container table-wrap">
+              {listWithItems && displayItems.length > 0 && chartData.length > 0 && (
+                <div className="chart-container table-wrap">
             <ResponsiveContainer width="100%" height={720}>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -790,16 +798,21 @@ function GraphContent({ token }: { token: string | null }) {
                 ))}
               </LineChart>
             </ResponsiveContainer>
-          </div>
-        )}
+                </div>
+              )}
 
-        {listWithItems && !listLoading && displayItems.length > 0 && chartData.length === 0 && !chartLoading && !chartError && (
-          <p className="widget-hint muted">Нет цен в выбранном диапазоне дат.</p>
-        )}
+              {listWithItems && displayItems.length > 0 && chartData.length === 0 && !chartLoading && !chartError && (
+                <p className="widget-hint muted">Нет цен в выбранном диапазоне дат.</p>
+              )}
 
-        {listWithItems && !listLoading && displayItems.length === 0 && (
-          <p className="widget-hint">Найдите и добавьте товары, затем настройте диапазон дат. Нажмите "Сохранить", чтобы закрепить список.</p>
-        )}
+              {listWithItems && displayItems.length === 0 && (
+                <p className="widget-hint">
+                  Найдите и добавьте товары, затем настройте диапазон дат. Нажмите &quot;Сохранить&quot;, чтобы закрепить список.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </section>
 
       {pointTip &&

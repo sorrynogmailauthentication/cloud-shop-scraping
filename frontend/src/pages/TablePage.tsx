@@ -6,7 +6,7 @@ import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
-import { useKeepScrollOnListSwitch } from '../hooks/useKeepScrollOnListSwitch';
+import { useListMainPreservedHeight } from '../hooks/useListMainPreservedHeight';
 import { useUserListEditor } from '../hooks/useUserListEditor';
 import type { PricePoint } from '../types/dashboard';
 import {
@@ -174,7 +174,7 @@ function TableContent({ token }: { token: string | null }) {
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'table' });
 
-  useKeepScrollOnListSwitch(currentListId, listLoading);
+  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() => {
@@ -274,7 +274,7 @@ function TableContent({ token }: { token: string | null }) {
   );
 
   useEffect(() => {
-    if (!token || !displayItems.length) {
+    if (!token || !displayItems.length || listLoading) {
       setHistByUrl(new Map());
       setHistLoading(false);
       setHistError('');
@@ -306,7 +306,7 @@ function TableContent({ token }: { token: string | null }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [token, tableUrlsKey, fromYmd, toYmd]);
+  }, [token, tableUrlsKey, fromYmd, toYmd, listLoading]);
 
   const cycleTableSort = useCallback((key: TableSortColumn) => {
     setTableSort((prev) => {
@@ -626,22 +626,31 @@ function TableContent({ token }: { token: string | null }) {
         {!currentListId && lists.length === 0 && (
           <p className="widget-hint muted">Загрузка вашей таблицы…</p>
         )}
-        {listLoading && <p className="muted">Загрузка…</p>}
-        {listWithItems && !listLoading && displayItems.length > 0 && (
-          <DateRangeSlicerPanel
-            timelineMax={timelineMax}
-            dateRange={dateRange}
-            setDateRange={setDateRange}
-            fromYmd={fromYmd}
-            toYmd={toYmd}
-            fromDateLabel={fromDateLabel}
-            toDateLabel={toDateLabel}
-            loading={histLoading}
-            error={histError || null}
-          />
-        )}
-        {listWithItems && !listLoading && (
-          <div className="table-wrap table-full-width" ref={tableItemsWrapRef}>
+        <div ref={mainBlockRef} className="list-main-data-block">
+          {listLoading ? (
+            <div
+              className="list-main-block-loading"
+              style={{ minHeight: loadingMinHeightPx }}
+              aria-busy
+            >
+              <p className="muted">Загрузка…</p>
+            </div>
+          ) : (
+            <>
+              {listWithItems && displayItems.length > 0 && (
+                <DateRangeSlicerPanel
+                  timelineMax={timelineMax}
+                  dateRange={dateRange}
+                  setDateRange={setDateRange}
+                  fromYmd={fromYmd}
+                  toYmd={toYmd}
+                  fromDateLabel={fromDateLabel}
+                  toDateLabel={toDateLabel}
+                  error={histError || null}
+                />
+              )}
+              {listWithItems && (
+                <div className="table-wrap table-full-width" ref={tableItemsWrapRef}>
             <table className="data-table data-table--selectable">
               <thead>
                 <tr>
@@ -819,8 +828,11 @@ function TableContent({ token }: { token: string | null }) {
             {displayItems.length === 0 && (
               <p className="muted table-empty">Нет элементов. Добавьте их через поиск выше.</p>
             )}
-          </div>
-        )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </section>
     </div>
   );

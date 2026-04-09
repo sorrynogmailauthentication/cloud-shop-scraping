@@ -706,9 +706,6 @@ html {
   color: var(--muted);
   font-weight: 400;
 }
-.date-range-slicer-status {
-  font-size: 0.85rem;
-}
 .date-range-slicer-error {
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
@@ -1201,6 +1198,16 @@ html {
 }
 .table-section {
   width: 100%;
+}
+.list-main-data-block {
+  width: 100%;
+}
+.list-main-block-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 1.5rem 1rem;
 }
 .table-toolbar-wrap {
   width: 100%;

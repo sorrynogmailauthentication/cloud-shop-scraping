@@ -9,6 +9,8 @@ export function SingleSelectDropdown({
   disabled,
   onChange,
   ariaLabel,
+  /** When list data is loading after a selection, force-close the menu (backup for click handler). */
+  listLoading,
 }: {
   options: DropdownOption[];
   value: string | null;
@@ -16,9 +18,18 @@ export function SingleSelectDropdown({
   disabled?: boolean;
   onChange: (next: string) => void;
   ariaLabel: string;
+  listLoading?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [value]);
+
+  useEffect(() => {
+    if (listLoading) setOpen(false);
+  }, [listLoading]);
 
   const selectedLabel = useMemo(() => {
     if (!value) return placeholder;

@@ -572,6 +572,7 @@ function TableContent({ token }: { token: string | null }) {
                 disabled={lists.length === 0 || tableToolsBusy}
                 onChange={(nextId) => setCurrentListId(nextId)}
                 ariaLabel="Выбор таблицы"
+                listLoading={listLoading}
               />
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">

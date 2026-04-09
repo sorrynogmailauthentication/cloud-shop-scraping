@@ -612,12 +612,20 @@ function GraphContent({ token }: { token: string | null }) {
             <div className="table-toolbar-actions">
               <button
                 type="button"
-                className="btn-add-all"
+                className={`btn-add-all${tableToolsBusy ? ' btn-add-all--busy' : ''}`}
                 disabled={tableToolsBusy || !saveTableName.trim()}
+                aria-busy={tableToolsBusy}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void handleSaveTableCopy()}
               >
-                Сохранить
+                {tableToolsBusy ? (
+                  <>
+                    <span className="btn-inline-spinner" aria-hidden />
+                    Сохранение…
+                  </>
+                ) : (
+                  'Сохранить'
+                )}
               </button>
               <button
                 type="button"

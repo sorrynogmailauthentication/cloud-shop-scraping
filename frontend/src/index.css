@@ -464,6 +464,31 @@ html {
 .btn-add-all:hover {
   background: var(--accent-hover);
 }
+.btn-add-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+.btn-add-all.btn-add-all--busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+.btn-inline-spinner {
+  width: 0.85em;
+  height: 0.85em;
+  box-sizing: border-box;
+  border: 2px solid rgba(15, 20, 25, 0.28);
+  border-top-color: var(--bg);
+  border-radius: 50%;
+  animation: btn-inline-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes btn-inline-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .search-results {
   max-height: 280px;
   overflow-y: auto;

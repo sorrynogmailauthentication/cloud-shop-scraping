@@ -9,6 +9,7 @@ import {
   addProductToList,
   clearListItems,
 } from '../api/dashboard';
+import { useAppDialog } from '../context/AppDialogContext';
 
 export function rowFromSearchProduct(p: ProductWithPrice, listId: string, seq: number): UserListItem {
   return {
@@ -27,6 +28,7 @@ export type UserListEditorOptions = {
 };
 
 export function useUserListEditor(token: string | null, options: UserListEditorOptions) {
+  const { showAlert, showConfirm } = useAppDialog();
   const { listKind } = options;
   const defaultListName = listKind === 'graph' ? 'график 1' : 'таблица 1';
   const selectedListStorageKey = `list-editor:selected-list:${listKind}`;
@@ -211,7 +213,14 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
 
     setTableToolsBusy(true);
     try {
-      if (currentListId && pendingItems !== null) {
+      /** Save edits only onto the list that is already selected (same name in the field). */
+      const inPlaceSave =
+        pendingItems !== null &&
+        currentListId != null &&
+        existing != null &&
+        existing.id === currentListId;
+
+      if (inPlaceSave) {
         await clearListItems(token, currentListId);
         for (const url of pendingItems.map((i) => i.product_url)) {
           try {
@@ -222,10 +231,15 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
         }
         setPendingItems(null);
         await loadListWithItems({ silent: true, forListId: currentListId });
+        const { lists: L } = await fetchMyLists(token, listKind);
+        setLists(L);
+        return;
       }
 
       let urls: string[] = [];
-      if (currentListId) {
+      if (pendingItems !== null) {
+        urls = pendingItems.map((i) => i.product_url);
+      } else if (currentListId) {
         const { list: source } = await fetchListWithItems(token, currentListId);
         urls = source.items.map((i) => i.product_url);
       }
@@ -239,6 +253,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
             /* skip */
           }
         }
+        setPendingItems(null);
         setCurrentListId(existing.id);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
@@ -251,12 +266,13 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
             /* skip */
           }
         }
+        setPendingItems(null);
         setCurrentListId(created.id);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
       }
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Не удалось сохранить');
+      await showAlert(e instanceof Error ? e.message : 'Не удалось сохранить', { title: 'Не удалось сохранить' });
     } finally {
       setTableToolsBusy(false);
     }
@@ -265,7 +281,15 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
   const handleDeleteTable = async () => {
     if (!token || !currentListId) return;
     const label = lists.find((l) => l.id === currentListId)?.name ?? 'этот список';
-    if (!window.confirm(`Удалить «${label}»?`)) return;
+    if (
+      !(await showConfirm(`Удалить «${label}»?`, {
+        title: 'Удалить список',
+        confirmLabel: 'Удалить',
+        cancelLabel: 'Отмена',
+        destructive: true,
+      }))
+    )
+      return;
     setTableToolsBusy(true);
     setPendingItems(null);
     try {
@@ -284,7 +308,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       setLists(L);
       setCurrentListId((prev) => (prev === id ? L[0]?.id ?? null : prev));
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Не удалось удалить');
+      await showAlert(e instanceof Error ? e.message : 'Не удалось удалить', { title: 'Не удалось удалить' });
     } finally {
       setTableToolsBusy(false);
     }

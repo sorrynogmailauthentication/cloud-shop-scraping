@@ -174,7 +174,7 @@ function TableContent({ token }: { token: string | null }) {
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'table' });
 
-  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading);
+  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading, tableToolsBusy);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() => {
@@ -591,6 +591,7 @@ function TableContent({ token }: { token: string | null }) {
                 type="button"
                 className="btn-add-all"
                 disabled={tableToolsBusy || !saveTableName.trim()}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void handleSaveTableCopy()}
               >
                 Сохранить

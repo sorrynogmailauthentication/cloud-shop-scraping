@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { useAppDialog } from '../context/AppDialogContext';
 import type { PricePoint, UserListItem } from '../types/dashboard';
 import { fetchPriceHistoryBatched } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
@@ -181,6 +182,7 @@ export default function GraphPage() {
 }
 
 function GraphContent({ token }: { token: string | null }) {
+  const { showAlert } = useAppDialog();
   const {
     lists,
     currentListId,
@@ -201,7 +203,7 @@ function GraphContent({ token }: { token: string | null }) {
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'graph' });
 
-  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading);
+  const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading, tableToolsBusy);
 
   const timelineMax = timelineMaxIdx(TABLE_DATE_ANCHOR_YMD);
   const [dateRange, setDateRange] = useState(() => {
@@ -560,11 +562,13 @@ function GraphContent({ token }: { token: string | null }) {
       await pptx.writeFile({ fileName: `tsenalitika-graph-${dateStamp}.pptx` });
     } catch (e) {
       console.error('PPTX export failed:', e);
-      window.alert(e instanceof Error ? e.message : 'Не удалось экспортировать PPTX');
+      await showAlert(e instanceof Error ? e.message : 'Не удалось экспортировать PPTX', {
+        title: 'Экспорт PPTX',
+      });
     } finally {
       setExportPptBusy(false);
     }
-  }, [sortedSnapshotRows, exportPptBusy, fromDateLabel, toDateLabel, snapshotYmd, toYmd]);
+  }, [sortedSnapshotRows, exportPptBusy, fromDateLabel, toDateLabel, snapshotYmd, toYmd, showAlert]);
 
   return (
     <div className="table-page-layout graph-page-layout">
@@ -610,6 +614,7 @@ function GraphContent({ token }: { token: string | null }) {
                 type="button"
                 className="btn-add-all"
                 disabled={tableToolsBusy || !saveTableName.trim()}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void handleSaveTableCopy()}
               >
                 Сохранить

@@ -170,6 +170,7 @@ function TableContent({ token }: { token: string | null }) {
     handleSaveTableCopy,
     handleDeleteTable,
     handleClearTable: clearListRows,
+    handleDiscardPendingChanges,
     addOneToList,
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'table' });
@@ -195,6 +196,8 @@ function TableContent({ token }: { token: string | null }) {
   const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
   const [histLoading, setHistLoading] = useState(false);
   const [histError, setHistError] = useState('');
+  const histCacheRef = useRef<Map<string, PricePoint[]>>(new Map());
+  const histWindowKeyRef = useRef<string>('');
   const [tableSort, setTableSort] = useState<TableSortState>({ key: null, dir: null });
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(() => new Set());
   const selectedUrlsRef = useRef(selectedUrls);
@@ -275,26 +278,45 @@ function TableContent({ token }: { token: string | null }) {
 
   useEffect(() => {
     if (!token || !displayItems.length || listLoading) {
+      histWindowKeyRef.current = '';
+      histCacheRef.current = new Map();
       setHistByUrl(new Map());
       setHistLoading(false);
       setHistError('');
       return;
     }
+    const windowKey = `${fromYmd}|${toYmd}`;
+    if (histWindowKeyRef.current !== windowKey) {
+      histWindowKeyRef.current = windowKey;
+      histCacheRef.current = new Map();
+    }
     const urls = [...new Set(displayItems.map((i) => i.product_url))];
+    const urlSet = new Set(urls);
+    let cacheChanged = false;
+    for (const url of [...histCacheRef.current.keys()]) {
+      if (urlSet.has(url)) continue;
+      histCacheRef.current.delete(url);
+      cacheChanged = true;
+    }
+    const missingUrls = urls.filter((u) => !histCacheRef.current.has(u));
+    if (missingUrls.length === 0) {
+      if (cacheChanged) setHistByUrl(new Map(histCacheRef.current));
+      setHistLoading(false);
+      setHistError('');
+      return;
+    }
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setHistLoading(true);
       setHistError('');
-      fetchPriceHistoryBatched(token, urls, fromYmd, toYmd)
+      fetchPriceHistoryBatched(token, missingUrls, fromYmd, toYmd)
         .then(({ results }) => {
           if (cancelled) return;
-          const m = new Map<string, PricePoint[]>();
-          results.forEach((r) => m.set(r.product_url, r.history));
-          setHistByUrl(m);
+          results.forEach((r) => histCacheRef.current.set(r.product_url, r.history));
+          setHistByUrl(new Map(histCacheRef.current));
         })
         .catch((e) => {
           if (!cancelled) {
-            setHistByUrl(new Map());
             setHistError(e instanceof Error ? e.message : 'Failed to load prices');
           }
         })
@@ -607,6 +629,14 @@ function TableContent({ token }: { token: string | null }) {
               </button>
               <button
                 type="button"
+                className={`btn-clear-table${pendingItems !== null ? '' : ' btn-clear-table--inactive'}`}
+                disabled={tableToolsBusy || pendingItems === null}
+                onClick={handleDiscardPendingChanges}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
                 className="btn-clear-table"
                 disabled={tableToolsBusy || !currentListId}
                 onClick={() => void handleDeleteTable()}
@@ -630,9 +660,15 @@ function TableContent({ token }: { token: string | null }) {
             </div>
           </div>
         </div>
-        {pendingItems !== null && (
-          <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
-        )}
+        <div className="list-pending-hint-slot" aria-live="polite">
+          {pendingItems !== null ? (
+            <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
+          ) : (
+            <p className="widget-hint" aria-hidden="true">
+              &nbsp;
+            </p>
+          )}
+        </div>
         {!currentListId && lists.length === 0 && (
           <p className="widget-hint muted">Загрузка вашей таблицы…</p>
         )}

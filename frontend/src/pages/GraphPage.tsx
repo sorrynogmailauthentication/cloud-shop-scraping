@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LineChart,
@@ -199,6 +199,7 @@ function GraphContent({ token }: { token: string | null }) {
     handleSaveTableCopy,
     handleDeleteTable,
     handleClearTable: clearListRows,
+    handleDiscardPendingChanges,
     addOneToList,
     handleAddAllFromSearch,
   } = useUserListEditor(token, { listKind: 'graph' });
@@ -247,6 +248,8 @@ function GraphContent({ token }: { token: string | null }) {
 
   const [chartData, setChartData] = useState<{ date: string; [key: string]: string | number | null }[]>([]);
   const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
+  const histCacheRef = useRef<Map<string, PricePoint[]>>(new Map());
+  const histWindowKeyRef = useRef<string>('');
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState('');
   const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
@@ -305,72 +308,91 @@ function GraphContent({ token }: { token: string | null }) {
 
   useEffect(() => {
     if (!token || displayItems.length === 0 || listLoading) {
+      histWindowKeyRef.current = '';
+      histCacheRef.current = new Map();
       setChartData([]);
       setHistByUrl(new Map());
       setChartError('');
       setChartLoading(false);
       return;
     }
-    let cancelled = false;
-    setChartLoading(true);
-    setChartError('');
-    const urls = displayItems.map((i) => i.product_url);
+    const urls = [...new Set(displayItems.map((i) => i.product_url))];
     const { fetchFrom, fetchTo } = expandPriceFetchWindow(
       fromYmd,
       toYmd,
       TABLE_DATE_ANCHOR_YMD,
       todayStr()
     );
-    fetchPriceHistoryBatched(token, urls, fetchFrom, fetchTo)
+    const windowKey = `${fetchFrom}|${fetchTo}`;
+    if (histWindowKeyRef.current !== windowKey) {
+      histWindowKeyRef.current = windowKey;
+      histCacheRef.current = new Map();
+    }
+    const urlSet = new Set(urls);
+    let cacheChanged = false;
+    for (const url of [...histCacheRef.current.keys()]) {
+      if (urlSet.has(url)) continue;
+      histCacheRef.current.delete(url);
+      cacheChanged = true;
+    }
+    const buildChartRows = (byUrl: Map<string, PricePoint[]>) => {
+      const byDate = new Map<string, Record<string, string | number | null>>();
+      const ensureRow = (d: string) => {
+        let row = byDate.get(d);
+        if (!row) {
+          row = { date: d };
+          byDate.set(d, row);
+        }
+        return row;
+      };
+      displayItems.forEach((item, idx) => {
+        const key = `p${idx}`;
+        const hist = byUrl.get(item.product_url) ?? [];
+        for (const pt of hist) {
+          const d = pt.date.slice(0, 10);
+          if (d < fromYmd || d > toYmd) continue;
+          if (pt.price == null) continue;
+          const row = ensureRow(d);
+          row[key] = pt.price;
+        }
+        const atStart = priceClosestByYmd(hist, fromYmd);
+        const atEnd = priceClosestByYmd(hist, toYmd);
+        if (atStart != null) {
+          const row = ensureRow(fromYmd);
+          if (row[key] == null) row[key] = atStart;
+        }
+        if (atEnd != null) {
+          const row = ensureRow(toYmd);
+          if (row[key] == null) row[key] = atEnd;
+        }
+      });
+      const sorted = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      return sorted.map(([, row]) => {
+        const obj: { date: string; [key: string]: string | number | null } = { date: row.date as string };
+        Object.keys(row).forEach((k) => (obj[k] = row[k] ?? null));
+        return obj;
+      });
+    };
+    const missingUrls = urls.filter((u) => !histCacheRef.current.has(u));
+    if (missingUrls.length === 0) {
+      if (cacheChanged) setHistByUrl(new Map(histCacheRef.current));
+      setChartData(buildChartRows(histCacheRef.current));
+      setChartLoading(false);
+      setChartError('');
+      return;
+    }
+    let cancelled = false;
+    setChartLoading(true);
+    setChartError('');
+    fetchPriceHistoryBatched(token, missingUrls, fetchFrom, fetchTo)
       .then(({ results }) => {
         if (cancelled) return;
-        const byUrl = new Map(results.map((r) => [r.product_url, r.history]));
-        setHistByUrl(byUrl);
-        const byDate = new Map<string, Record<string, string | number | null>>();
-
-        const ensureRow = (d: string) => {
-          let row = byDate.get(d);
-          if (!row) {
-            row = { date: d };
-            byDate.set(d, row);
-          }
-          return row;
-        };
-
-        displayItems.forEach((item, idx) => {
-          const key = `p${idx}`;
-          const hist = byUrl.get(item.product_url) ?? [];
-          for (const pt of hist) {
-            const d = pt.date.slice(0, 10);
-            if (d < fromYmd || d > toYmd) continue;
-            if (pt.price == null) continue;
-            const row = ensureRow(d);
-            row[key] = pt.price;
-          }
-          const atStart = priceClosestByYmd(hist, fromYmd);
-          const atEnd = priceClosestByYmd(hist, toYmd);
-          if (atStart != null) {
-            const row = ensureRow(fromYmd);
-            if (row[key] == null) row[key] = atStart;
-          }
-          if (atEnd != null) {
-            const row = ensureRow(toYmd);
-            if (row[key] == null) row[key] = atEnd;
-          }
-        });
-
-        const sorted = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-        const out = sorted.map(([, row]) => {
-          const obj: { date: string; [key: string]: string | number | null } = { date: row.date as string };
-          Object.keys(row).forEach((k) => (obj[k] = row[k] ?? null));
-          return obj;
-        });
-        setChartData(out);
+        results.forEach((r) => histCacheRef.current.set(r.product_url, r.history));
+        setHistByUrl(new Map(histCacheRef.current));
+        setChartData(buildChartRows(histCacheRef.current));
       })
       .catch((e) => {
         if (!cancelled) {
-          setChartData([]);
-          setHistByUrl(new Map());
           setChartError(e instanceof Error ? e.message : 'Failed to load chart');
         }
       })
@@ -630,6 +652,14 @@ function GraphContent({ token }: { token: string | null }) {
               </button>
               <button
                 type="button"
+                className={`btn-clear-table${pendingItems !== null ? '' : ' btn-clear-table--inactive'}`}
+                disabled={tableToolsBusy || pendingItems === null}
+                onClick={handleDiscardPendingChanges}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
                 className="btn-clear-table"
                 disabled={tableToolsBusy || !currentListId}
                 onClick={() => void handleDeleteTable()}
@@ -654,9 +684,15 @@ function GraphContent({ token }: { token: string | null }) {
           </div>
         </div>
 
-        {pendingItems !== null && (
-          <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
-        )}
+        <div className="list-pending-hint-slot" aria-live="polite">
+          {pendingItems !== null ? (
+            <p className="widget-hint">Есть несохраненные изменения строк — нажмите "Сохранить", чтобы отправить их на сервер.</p>
+          ) : (
+            <p className="widget-hint" aria-hidden="true">
+              &nbsp;
+            </p>
+          )}
+        </div>
         {!currentListId && lists.length === 0 && (
           <p className="widget-hint muted">Загрузка вашего графика…</p>
         )}

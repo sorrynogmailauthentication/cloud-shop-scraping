@@ -8,6 +8,7 @@ import {
   updateList,
   deleteList,
   addListItem,
+  addListItemsBatch,
   removeListItem,
   clearListItems,
   type UserListKind,
@@ -145,6 +146,32 @@ router.post('/lists/:id/items', async (req: Request, res: Response) => {
     return;
   }
   res.status(201).json({ ok: true });
+});
+
+/** POST /api/me/lists/:id/items/batch - add many products. Body: { product_urls: string[] } */
+router.post('/lists/:id/items/batch', async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const listId = req.params.id;
+  const urlsRaw = req.body?.product_urls;
+  if (!Array.isArray(urlsRaw)) {
+    res.status(400).json({ error: 'product_urls is required' });
+    return;
+  }
+  const productUrls = urlsRaw
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter((v) => v.length > 0);
+  try {
+    const out = await addListItemsBatch(listId, userId, productUrls);
+    res.status(201).json({ ok: true, added_count: out.addedCount, missing_urls: out.missingUrls });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === 'List not found') {
+      res.status(404).json({ error: msg });
+      return;
+    }
+    console.error('Batch add list items error:', e);
+    res.status(500).json({ error: 'Failed to add items' });
+  }
 });
 
 /** DELETE /api/me/lists/:id/items/:productUrl - remove product from list */

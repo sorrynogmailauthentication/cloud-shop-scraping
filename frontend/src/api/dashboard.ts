@@ -179,6 +179,21 @@ export async function addProductToList(
   if (!res.ok) throw new Error(await res.text().catch(() => 'Add to list failed'));
 }
 
+export async function addProductsToListBatch(
+  token: string | null,
+  listId: string,
+  productUrls: string[]
+): Promise<{ added_count: number; missing_urls: string[] }> {
+  const res = await fetch(`${API_BASE}/api/me/lists/${encodeURIComponent(listId)}/items/batch`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    credentials: 'include',
+    body: JSON.stringify({ product_urls: productUrls }),
+  });
+  if (!res.ok) throw new Error(await readApiErrorBody(res));
+  return res.json();
+}
+
 export async function removeProductFromList(
   token: string | null,
   listId: string,

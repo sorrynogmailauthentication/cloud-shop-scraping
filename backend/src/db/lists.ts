@@ -234,6 +234,66 @@ export async function addListItem(
   }
 }
 
+export async function addListItemsBatch(
+  listId: string,
+  userId: string,
+  productUrls: string[]
+): Promise<{ addedCount: number; missingUrls: string[] }> {
+  const uniqueUrls = [...new Set(productUrls.map((u) => u.trim()).filter(Boolean))];
+  if (uniqueUrls.length === 0) return { addedCount: 0, missingUrls: [] };
+
+  const list = await getListById(listId, userId);
+  if (!list) throw new Error('List not found');
+
+  const pool = getPool();
+  const res = await pool.query<{
+    added_count: number;
+    missing_urls: string[];
+  }>(
+    `WITH input AS (
+       SELECT url, ord
+       FROM unnest($2::text[]) WITH ORDINALITY AS u(url, ord)
+     ),
+     found AS (
+       SELECT i.url, i.ord, p.product_id
+       FROM input i
+       JOIN products p ON p.url = i.url
+     ),
+     base AS (
+       SELECT COALESCE(MAX(position), -1) AS max_pos
+       FROM user_list_items
+       WHERE list_id = $1
+     ),
+     ins AS (
+       INSERT INTO user_list_items (list_id, product_id, position)
+       SELECT
+         $1,
+         f.product_id::uuid,
+         b.max_pos + ROW_NUMBER() OVER (ORDER BY f.ord)
+       FROM found f
+       CROSS JOIN base b
+       ON CONFLICT (list_id, product_id) DO NOTHING
+       RETURNING 1
+     )
+     SELECT
+       (SELECT COUNT(*)::int FROM ins) AS added_count,
+       COALESCE(
+         (SELECT array_agg(i.url ORDER BY i.ord)
+          FROM input i
+          LEFT JOIN found f ON f.url = i.url
+          WHERE f.product_id IS NULL),
+         ARRAY[]::text[]
+       ) AS missing_urls`,
+    [listId, uniqueUrls]
+  );
+
+  const row = res.rows[0];
+  return {
+    addedCount: Number(row?.added_count ?? 0),
+    missingUrls: Array.isArray(row?.missing_urls) ? row.missing_urls : [],
+  };
+}
+
 export async function removeListItem(
   listId: string,
   userId: string,

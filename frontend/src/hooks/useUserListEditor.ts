@@ -6,7 +6,7 @@ import {
   fetchListWithItems,
   createList,
   deleteListApi,
-  addProductToList,
+  addProductsToListBatch,
   clearListItems,
 } from '../api/dashboard';
 import { useAppDialog } from '../context/AppDialogContext';
@@ -222,13 +222,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
 
       if (inPlaceSave) {
         await clearListItems(token, currentListId);
-        for (const url of pendingItems.map((i) => i.product_url)) {
-          try {
-            await addProductToList(token, currentListId, url);
-          } catch {
-            /* skip */
-          }
-        }
+        await addProductsToListBatch(token, currentListId, pendingItems.map((i) => i.product_url));
         setPendingItems(null);
         await loadListWithItems({ silent: true, forListId: currentListId });
         const { lists: L } = await fetchMyLists(token, listKind);
@@ -246,26 +240,14 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
 
       if (existing) {
         await clearListItems(token, existing.id);
-        for (const url of urls) {
-          try {
-            await addProductToList(token, existing.id, url);
-          } catch {
-            /* skip */
-          }
-        }
+        await addProductsToListBatch(token, existing.id, urls);
         setPendingItems(null);
         setCurrentListId(existing.id);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
       } else {
         const { list: created } = await createList(token, name, null, listKind);
-        for (const url of urls) {
-          try {
-            await addProductToList(token, created.id, url);
-          } catch {
-            /* skip */
-          }
-        }
+        await addProductsToListBatch(token, created.id, urls);
         setPendingItems(null);
         setCurrentListId(created.id);
         const { lists: L } = await fetchMyLists(token, listKind);
@@ -319,6 +301,10 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     setPendingItems([]);
   };
 
+  const handleDiscardPendingChanges = () => {
+    setPendingItems(null);
+  };
+
   return {
     lists,
     currentListId,
@@ -337,6 +323,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     handleSaveTableCopy,
     handleDeleteTable,
     handleClearTable,
+    handleDiscardPendingChanges,
     addOneToList,
     handleAddAllFromSearch,
   };

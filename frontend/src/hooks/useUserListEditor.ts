@@ -223,8 +223,8 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       if (inPlaceSave) {
         await clearListItems(token, currentListId);
         await addProductsToListBatch(token, currentListId, pendingItems.map((i) => i.product_url));
-        setPendingItems(null);
         await loadListWithItems({ silent: true, forListId: currentListId });
+        setPendingItems(null);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
         return;
@@ -241,17 +241,17 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
       if (existing) {
         await clearListItems(token, existing.id);
         await addProductsToListBatch(token, existing.id, urls);
-        setPendingItems(null);
         setCurrentListId(existing.id);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
+        setPendingItems(null);
       } else {
         const { list: created } = await createList(token, name, null, listKind);
         await addProductsToListBatch(token, created.id, urls);
-        setPendingItems(null);
         setCurrentListId(created.id);
         const { lists: L } = await fetchMyLists(token, listKind);
         setLists(L);
+        setPendingItems(null);
       }
     } catch (e) {
       await showAlert(e instanceof Error ? e.message : 'Не удалось сохранить', { title: 'Не удалось сохранить' });

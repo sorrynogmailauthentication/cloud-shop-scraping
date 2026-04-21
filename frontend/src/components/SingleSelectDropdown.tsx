@@ -82,7 +82,7 @@ export function SingleSelectDropdown({
               }}
               title={o.label}
             >
-              {o.label}
+              <span className="search-dropdown-option-text">{o.label}</span>
             </div>
           ))}
         </div>

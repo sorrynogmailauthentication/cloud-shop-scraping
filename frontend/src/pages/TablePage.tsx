@@ -130,8 +130,7 @@ export default function TablePage() {
       <main className="dashboard dashboard-waiting">
         <h2>Ожидайте подтверждения от администратора</h2>
         <p className="muted">
-          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>
-          {user?.email && ` — ${user.email}`}) ожидает подтверждения.
+          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>) ожидает подтверждения.
         </p>
       </main>
     );

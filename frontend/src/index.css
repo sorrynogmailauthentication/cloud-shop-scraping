@@ -510,8 +510,8 @@ html {
 /* Table page search: product | shop+category | price stack | button */
 .search-result-row--table {
   align-items: start;
-  column-gap: 1.25rem;
-  grid-template-columns: minmax(0, 1fr) 11.5rem 12rem auto;
+  column-gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) 12rem 12rem auto;
 }
 .search-result-row .result-name {
   min-width: 0;
@@ -534,10 +534,13 @@ html {
   white-space: nowrap;
 }
 .search-result-row .result-shop-category {
+  min-width: 0;
   font-size: 0.78rem;
   color: var(--muted);
   line-height: 1.25;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .search-result-row .result-price-stack {
   display: flex;
@@ -1198,6 +1201,15 @@ html {
   font-size: 0.9rem;
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+}
+.search-dropdown-option > span,
+.search-dropdown-option-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .search-dropdown-option:hover {
   background: rgba(255, 255, 255, 0.06);
@@ -1479,65 +1491,6 @@ html {
   border-radius: 8px;
   background: var(--surface-elevated, var(--surface));
   overflow-x: auto;
-}
-.graph-snapshot-panel-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
-  margin-bottom: 0.65rem;
-}
-.graph-snapshot-date-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.graph-snapshot-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text);
-}
-.graph-snapshot-date-input {
-  font: inherit;
-  font-size: 0.875rem;
-  height: var(--search-control-height);
-  padding: 0 2.1rem 0 0.75rem;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  line-height: calc(var(--search-control-height) - 2px);
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-}
-.graph-snapshot-date-input:hover {
-  border-color: var(--muted);
-}
-.graph-snapshot-date-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.graph-snapshot-date-input::-webkit-calendar-picker-indicator {
-  opacity: 0.75;
-  cursor: pointer;
-  filter: invert(78%) sepia(13%) saturate(356%) hue-rotate(176deg) brightness(90%) contrast(86%);
-}
-.graph-snapshot-date-input::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-}
-.graph-snapshot-date-input::-webkit-datetime-edit {
-  color: var(--text);
-}
-.graph-snapshot-date-input::-webkit-datetime-edit-text {
-  color: var(--muted);
-}
-.graph-snapshot-date-input::-webkit-clear-button,
-.graph-snapshot-date-input::-webkit-inner-spin-button {
-  display: none;
-}
-.graph-snapshot-date-hint {
-  font-size: 0.8125rem;
 }
 .graph-snapshot-error {
   margin: 0 0 0.5rem;

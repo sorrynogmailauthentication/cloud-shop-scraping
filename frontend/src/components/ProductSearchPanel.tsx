@@ -302,7 +302,7 @@ export function ProductSearchPanel({
                             );
                           }}
                         />
-                        <span>{s}</span>
+                        <span title={s}>{s}</span>
                       </label>
                     ))}
                   </div>
@@ -382,7 +382,7 @@ export function ProductSearchPanel({
                               );
                             }}
                           />
-                          <span>
+                          <span title={`${p.shop} — ${p.category}`}>
                             {p.shop} - {p.category}
                           </span>
                         </label>
@@ -576,7 +576,11 @@ export function ProductSearchPanel({
                     <span className="result-name">{p.product_name || p.url}</span>
                     <div className="result-shop-stack">
                       <span className="result-shop-main">{p.shop ?? '—'}</span>
-                      {p.category ? <span className="result-shop-category">{p.category}</span> : null}
+                      {p.category ? (
+                        <span className="result-shop-category" title={p.category}>
+                          {p.category}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="result-price-stack">
                       <span className="result-price-main">{p.price != null ? formatPriceDisplay(p.price) : '—'}</span>

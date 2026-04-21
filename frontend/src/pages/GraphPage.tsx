@@ -158,8 +158,7 @@ export default function GraphPage() {
       <main className="dashboard dashboard-waiting">
         <h2>Ожидайте подтверждения от администратора</h2>
         <p className="muted">
-          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>
-          {user?.email && ` — ${user.email}`}) ожидает подтверждения.
+          Ваш аккаунт (<strong>{user?.displayName || user?.login}</strong>) ожидает подтверждения.
         </p>
       </main>
     );
@@ -253,7 +252,6 @@ function GraphContent({ token }: { token: string | null }) {
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState('');
   const [pointTip, setPointTip] = useState<GraphPointTip | null>(null);
-  const [snapshotYmd, setSnapshotYmd] = useState<string | null>(null);
   const [snapshotPriceSortDir, setSnapshotPriceSortDir] = useState<SnapshotPriceSortDir>(null);
   const [exportPptBusy, setExportPptBusy] = useState(false);
 
@@ -408,15 +406,8 @@ function GraphContent({ token }: { token: string | null }) {
     setPointTip(null);
   }, [chartItemsKey, fromYmd, toYmd, chartData.length]);
 
-  useEffect(() => {
-    setSnapshotYmd((prev) => {
-      if (prev == null || prev < fromYmd || prev > toYmd) return toYmd;
-      return prev;
-    });
-  }, [fromYmd, toYmd]);
-
   const snapshotRows = useMemo(() => {
-    const day = snapshotYmd ?? toYmd;
+    const day = toYmd;
     if (!day || displayItems.length === 0) return [];
     return displayItems.map((item, i) => {
       const hist = histByUrl.get(item.product_url) ?? [];
@@ -430,7 +421,7 @@ function GraphContent({ token }: { token: string | null }) {
         color: chartColorForProductUrl(item.product_url),
       };
     });
-  }, [snapshotYmd, toYmd, displayItems, histByUrl]);
+  }, [toYmd, displayItems, histByUrl]);
 
   const sortedSnapshotRows = useMemo(() => {
     if (snapshotPriceSortDir == null) return snapshotRows;
@@ -545,7 +536,7 @@ function GraphContent({ token }: { token: string | null }) {
 
       const tableSlide = pptx.addSlide();
       tableSlide.background = { color: '1A2332' };
-      tableSlide.addText(`Список товаров на дату: ${formatYmdDisplay(snapshotYmd ?? toYmd)}`, {
+      tableSlide.addText(`Список товаров на дату: ${toDateLabel}`, {
         x: 0.35,
         y: 0.2,
         w: 12.0,
@@ -590,7 +581,7 @@ function GraphContent({ token }: { token: string | null }) {
     } finally {
       setExportPptBusy(false);
     }
-  }, [sortedSnapshotRows, exportPptBusy, fromDateLabel, toDateLabel, snapshotYmd, toYmd, showAlert]);
+  }, [sortedSnapshotRows, exportPptBusy, fromDateLabel, toDateLabel, showAlert]);
 
   return (
     <div className="table-page-layout graph-page-layout">
@@ -722,26 +713,6 @@ function GraphContent({ token }: { token: string | null }) {
 
               {listWithItems && displayItems.length > 0 && (
                 <div className="graph-snapshot-panel">
-            <div className="graph-snapshot-panel-head">
-              <label className="graph-snapshot-date-field">
-                <span className="graph-snapshot-label">Цены на дату</span>
-                <input
-                  type="date"
-                  className="graph-snapshot-date-input"
-                  min={fromYmd}
-                  max={toYmd}
-                  value={snapshotYmd ?? toYmd}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v >= fromYmd && v <= toYmd) setSnapshotYmd(v);
-                  }}
-                  aria-label="Дата для списка цен"
-                />
-              </label>
-              <span className="graph-snapshot-date-hint muted">
-                {formatYmdDisplay(snapshotYmd ?? toYmd)}
-              </span>
-            </div>
             {chartError ? (
               <p className="widget-error graph-snapshot-error">{chartError}</p>
             ) : (
@@ -757,7 +728,7 @@ function GraphContent({ token }: { token: string | null }) {
                         prev == null ? 'asc' : prev === 'asc' ? 'desc' : null
                       )
                     }
-                    title="Сортировать по цене на выбранную дату"
+                    title="Сортировать по цене на конец периода (правая граница дат)"
                   >
                     <span className="table-sort-label">Цена</span>
                     <span className="table-sort-arrows" aria-hidden>
@@ -769,7 +740,7 @@ function GraphContent({ token }: { token: string | null }) {
                   <span className="graph-snapshot-col-pct">%</span>
                   <span className="graph-snapshot-col-remove" />
                 </div>
-                <ul className="graph-snapshot-list" aria-label="Цены товаров на выбранную дату">
+                <ul className="graph-snapshot-list" aria-label={`Цены товаров на ${toDateLabel}`}>
                   {sortedSnapshotRows.map(
                     ({ item, price, priceBeforeDiscount, discountPct, color }) => (
                       <li
@@ -813,7 +784,7 @@ function GraphContent({ token }: { token: string | null }) {
               </>
             )}
             <p className="graph-snapshot-footnote muted">
-              Если на выбранный день нет цены, показывается ближайшая доступная цена из истории (как на графике).
+              Если на последний день периода нет цены, показывается ближайшая доступная цена из истории (как на графике).
             </p>
                 </div>
               )}

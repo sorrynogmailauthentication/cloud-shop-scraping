@@ -268,7 +268,6 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--shop">
               <div className="search-dropdown-wrap search-dropdown-wrap--shop" ref={shopDropdownRef}>
-                <label className="search-multi-label">Магазин</label>
                 <button
                   type="button"
                   className="search-dropdown-trigger"
@@ -324,7 +323,6 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--categories">
               <div className="search-dropdown-wrap search-dropdown-wrap--categories" ref={categoryDropdownRef}>
-                <label className="search-multi-label">Магазин - Категория</label>
                 <button
                   type="button"
                   className="search-dropdown-trigger search-dropdown-trigger--categories"
@@ -510,51 +508,49 @@ export function ProductSearchPanel({
                 ✕
               </button>
             </div>
-            <div className="search-filter-price-group">
-              <div className="search-field-with-clear search-field-with-clear--filter-num">
-                <input
-                  type="number"
-                  placeholder="Цена от (мин.)"
-                  value={priceAbove}
-                  onChange={(e) => setPriceAbove(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                  className="search-input search-input-num"
-                  min={0}
-                  step={0.01}
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!priceAbove.trim()}
-                  onClick={() => setPriceAbove('')}
-                  aria-label="Очистить мин. цену"
-                  title="Очистить"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="search-field-with-clear search-field-with-clear--filter-num">
-                <input
-                  type="number"
-                  placeholder="Цена до (макс.)"
-                  value={priceBelow}
-                  onChange={(e) => setPriceBelow(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                  className="search-input search-input-num"
-                  min={0}
-                  step={0.01}
-                />
-                <button
-                  type="button"
-                  className="search-field-clear"
-                  disabled={!priceBelow.trim()}
-                  onClick={() => setPriceBelow('')}
-                  aria-label="Очистить макс. цену"
-                  title="Очистить"
-                >
-                  ✕
-                </button>
-              </div>
+            <div className="search-field-with-clear search-field-with-clear--filter-num">
+              <input
+                type="number"
+                placeholder="Цена от (мин.)"
+                value={priceAbove}
+                onChange={(e) => setPriceAbove(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                className="search-input search-input-num"
+                min={0}
+                step={0.01}
+              />
+              <button
+                type="button"
+                className="search-field-clear"
+                disabled={!priceAbove.trim()}
+                onClick={() => setPriceAbove('')}
+                aria-label="Очистить мин. цену"
+                title="Очистить"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="search-field-with-clear search-field-with-clear--filter-num">
+              <input
+                type="number"
+                placeholder="Цена до (макс.)"
+                value={priceBelow}
+                onChange={(e) => setPriceBelow(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                className="search-input search-input-num"
+                min={0}
+                step={0.01}
+              />
+              <button
+                type="button"
+                className="search-field-clear"
+                disabled={!priceBelow.trim()}
+                onClick={() => setPriceBelow('')}
+                aria-label="Очистить макс. цену"
+                title="Очистить"
+              >
+                ✕
+              </button>
             </div>
           </div>
           {searchResults.length > 0 && (

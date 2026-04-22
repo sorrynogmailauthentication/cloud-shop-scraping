@@ -455,6 +455,19 @@ function GraphContent({ token }: { token: string | null }) {
     () => priceChartYDomain(chartData, displayItems.length),
     [chartData, displayItems.length]
   );
+  const [isNarrowLegend, setIsNarrowLegend] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(max-width: 900px)');
+    const apply = () => setIsNarrowLegend(mql.matches);
+    apply();
+    mql.addEventListener('change', apply);
+    return () => mql.removeEventListener('change', apply);
+  }, []);
+  const legendColumns = isNarrowLegend ? 2 : 4;
+  const legendRows = Math.max(1, Math.ceil(displayItems.length / legendColumns));
+  const legendHeight = Math.max(36, legendRows * 22 + 8);
+  const chartTotalHeight = 720 + Math.max(0, legendHeight - 36);
 
   const exportGraphToPptx = useCallback(async () => {
     if (sortedSnapshotRows.length === 0 || exportPptBusy) return;
@@ -790,9 +803,9 @@ function GraphContent({ token }: { token: string | null }) {
               )}
 
               {listWithItems && displayItems.length > 0 && chartData.length > 0 && (
-                <div className="chart-container table-wrap">
-            <ResponsiveContainer width="100%" height={720}>
-              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <div className="chart-container">
+            <ResponsiveContainer width="100%" height={chartTotalHeight}>
+              <LineChart data={chartData} margin={{ top: 8, right: 56, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
                 <YAxis
@@ -803,7 +816,12 @@ function GraphContent({ token }: { token: string | null }) {
                   interval={0}
                 />
                 <Tooltip active={false} cursor={false} />
-                <Legend />
+                <Legend
+                  layout="horizontal"
+                  align="center"
+                  verticalAlign="bottom"
+                  height={legendHeight}
+                />
                 {displayItems.map((item, i) => (
                   <Line
                     key={item.product_url}

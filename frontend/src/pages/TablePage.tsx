@@ -743,22 +743,6 @@ function TableContent({ token }: { token: string | null }) {
                     <abbr title={`Ближайшая цена к ${toDateLabel}`}>Цена, конец</abbr>
                   </SortableTh>
                   <SortableTh
-                    columnKey="beforeDiscount"
-                    sort={tableSort}
-                    onSort={cycleTableSort}
-                    className="table-col-num"
-                  >
-                    До скидки
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="discountPct"
-                    sort={tableSort}
-                    onSort={cycleTableSort}
-                    className="table-col-pct"
-                  >
-                    Скидка %
-                  </SortableTh>
-                  <SortableTh
                     columnKey="deltaPrice"
                     sort={tableSort}
                     onSort={cycleTableSort}
@@ -775,6 +759,22 @@ function TableContent({ token }: { token: string | null }) {
                     title={`Процентное изменение, ${fromDateLabel} → ${toDateLabel}`}
                   >
                     <abbr title={`Процентное изменение, ${fromDateLabel} → ${toDateLabel}`}>Δ %</abbr>
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="beforeDiscount"
+                    sort={tableSort}
+                    onSort={cycleTableSort}
+                    className="table-col-num"
+                  >
+                    До скидки
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="discountPct"
+                    sort={tableSort}
+                    onSort={cycleTableSort}
+                    className="table-col-pct"
+                  >
+                    Скидка %
                   </SortableTh>
                   <th className="sort-th--narrow" aria-label="Удалить" />
                 </tr>
@@ -816,12 +816,6 @@ function TableContent({ token }: { token: string | null }) {
                       <td className="table-col-num">
                         {histLoading ? '…' : p1 != null ? formatPriceDisplay(p1) : '—'}
                       </td>
-                      <td className="table-col-num">
-                        {item.product?.price_before_discount != null
-                          ? formatPriceDisplay(item.product.price_before_discount)
-                          : '—'}
-                      </td>
-                      <td className="table-col-pct">{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
                       <td
                         className={
                           (dn != null && dn > 0
@@ -844,6 +838,12 @@ function TableContent({ token }: { token: string | null }) {
                       >
                         {histLoading ? '…' : formatDeltaPctOnly(p0, p1)}
                       </td>
+                      <td className="table-col-num">
+                        {item.product?.price_before_discount != null
+                          ? formatPriceDisplay(item.product.price_before_discount)
+                          : '—'}
+                      </td>
+                      <td className="table-col-pct">{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
                       <td>
                         <button
                           type="button"

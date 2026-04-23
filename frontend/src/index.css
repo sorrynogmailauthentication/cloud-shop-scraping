@@ -1487,6 +1487,17 @@ html {
   width: 100%;
   overflow-x: auto;
 }
+/* Table page: once table reaches viewport top, keep header visible and scroll table body. */
+.table-page .table-full-width {
+  overflow: auto;
+  max-height: calc(100vh - 9rem);
+}
+.table-page .table-full-width .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface);
+}
 .cell-wrap {
   white-space: normal;
   word-wrap: break-word;

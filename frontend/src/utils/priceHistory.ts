@@ -123,11 +123,9 @@ export function formatPriceDelta(start: number | null, end: number | null): stri
 export function formatDeltaPriceOnly(start: number | null, end: number | null): string {
   if (start == null || end == null) return '—';
   const d = end - start;
-  if (Math.abs(d) < 1e-9) return '0';
+  if (Math.abs(d) < 1e-9) return '0.00';
   const dR = Math.round(d * 100) / 100;
-  return Math.abs(dR - Math.round(dR)) < 1e-9
-    ? Math.round(dR).toFixed(2)
-    : String(parseFloat(dR.toFixed(2)));
+  return dR.toFixed(2);
 }
 
 /** Percent change from start to end price; — when undefined (e.g. start is 0). */

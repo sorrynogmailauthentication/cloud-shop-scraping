@@ -102,6 +102,22 @@ html {
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
 }
+.login-consent {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+.login-consent input[type='checkbox'] {
+  margin-top: 0;
+}
+.login-consent a {
+  color: var(--accent);
+}
 .btn-yandex {
   display: inline-flex;
   align-items: center;
@@ -124,6 +140,10 @@ html {
 }
 .btn-yandex:active {
   transform: scale(0.98);
+}
+.btn-yandex:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .btn-yandex-icon {
   width: 22px;

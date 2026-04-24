@@ -200,7 +200,7 @@ function GraphContent({ token }: { token: string | null }) {
     handleClearTable: clearListRows,
     handleDiscardPendingChanges,
     addOneToList,
-    handleAddAllFromSearch,
+    handleAddManyFromSearch,
   } = useUserListEditor(token, { listKind: 'graph' });
 
   const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading, tableToolsBusy);
@@ -603,8 +603,8 @@ function GraphContent({ token }: { token: string | null }) {
         existingUrls={inListUrls}
         addDisabled={!currentListId}
         onAddOne={addOneToList}
-        onAddAll={handleAddAllFromSearch}
-        addAllLabel="Добавить всё загруженное в график"
+        onAddMany={handleAddManyFromSearch}
+        addSelectedLabel="Добавить выбранные в график"
         addOneTitle="Добавить в график"
         alreadyInPhrase="графике"
       />

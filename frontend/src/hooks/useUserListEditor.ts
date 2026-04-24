@@ -190,7 +190,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     setPendingItems([...base, rowFromSearchProduct(product, currentListId, base.length)]);
   };
 
-  const handleAddAllFromSearch = (products: ProductWithPrice[]) => {
+  const handleAddManyFromSearch = (products: ProductWithPrice[]) => {
     if (!currentListId) return;
     const base = pendingItems ?? listWithItems?.items ?? [];
     const existing = new Set(base.map((i) => i.product_url));
@@ -325,6 +325,6 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     handleClearTable,
     handleDiscardPendingChanges,
     addOneToList,
-    handleAddAllFromSearch,
+    handleAddManyFromSearch,
   };
 }

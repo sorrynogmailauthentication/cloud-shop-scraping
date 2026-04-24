@@ -1,19 +1,44 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { fetchShops, fetchShopCategoryPairs, searchProducts } from '../api/dashboard';
 import type { ShopCategoryPair } from '../api/dashboard';
 import type { ProductWithPrice } from '../types/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
 
-const SEARCH_PAGE_SIZE = 20;
-const MIN_FILTERED_RESULTS = 5;
+const SEARCH_PAGE_SIZE = 10;
+const VISIBLE_ROWS = { compact: 5, expanded: 10 } as const;
+type VisibleRowCap = (typeof VISIBLE_ROWS)[keyof typeof VISIBLE_ROWS];
+const SEARCH_VISIBLE_ROWS_STORAGE_KEY = 'search:visible-rows:v1';
+
+function readStoredVisibleRowCap(): VisibleRowCap {
+  if (typeof window === 'undefined') return VISIBLE_ROWS.compact;
+  try {
+    const raw = window.localStorage.getItem(SEARCH_VISIBLE_ROWS_STORAGE_KEY);
+    if (raw === String(VISIBLE_ROWS.expanded)) return VISIBLE_ROWS.expanded;
+    if (raw === String(VISIBLE_ROWS.compact)) return VISIBLE_ROWS.compact;
+  } catch {
+    /* ignore */
+  }
+  return VISIBLE_ROWS.compact;
+}
 
 export type ProductSearchPanelProps = {
   token: string | null;
   existingUrls: Set<string>;
   addDisabled?: boolean;
   onAddOne: (p: ProductWithPrice) => void | Promise<void>;
-  onAddAll: (products: ProductWithPrice[]) => void | Promise<void>;
-  addAllLabel?: string;
+  /** Add multiple products (e.g. current multi-selection in search results). */
+  onAddMany: (products: ProductWithPrice[]) => void | Promise<void>;
+  addSelectedLabel?: string;
+  /** Select every row currently shown (after client-side filters). */
+  selectAllVisibleLabel?: string;
   addOneTitle?: string;
   alreadyInPhrase?: string;
   resultRowClassName?: string;
@@ -24,8 +49,9 @@ export function ProductSearchPanel({
   existingUrls,
   addDisabled = false,
   onAddOne,
-  onAddAll,
-  addAllLabel = 'Добавить всё загруженное в таблицу',
+  onAddMany,
+  addSelectedLabel = 'Добавить выбранные в таблицу',
+  selectAllVisibleLabel = 'Выбрать всё',
   addOneTitle = 'Добавить в таблицу',
   alreadyInPhrase = 'таблице',
   resultRowClassName = 'search-result-row--table',
@@ -49,6 +75,7 @@ export function ProductSearchPanel({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [visibleRowCap, setVisibleRowCap] = useState<VisibleRowCap>(readStoredVisibleRowCap);
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const searchToggleRef = useRef<HTMLButtonElement>(null);
   const scrollYOnCloseRef = useRef<number | null>(null);
@@ -56,6 +83,12 @@ export function ProductSearchPanel({
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const shopDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedSearchUrls, setSelectedSearchUrls] = useState<Set<string>>(() => new Set());
+  const selectedSearchUrlsRef = useRef(selectedSearchUrls);
+  selectedSearchUrlsRef.current = selectedSearchUrls;
+  const searchSelectMouseDownRef = useRef(false);
+  const searchDragAnchorRef = useRef<number | null>(null);
+  const searchSelectionWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: Event) {
@@ -73,6 +106,15 @@ export function ProductSearchPanel({
     fetchShops(token).then(({ shops: s }) => setShops(s)).catch(() => setShops([]));
     fetchShopCategoryPairs(token).then(({ pairs: p }) => setShopCategoryPairs(p)).catch(() => setShopCategoryPairs([]));
   }, [searchOpen, token]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(SEARCH_VISIBLE_ROWS_STORAGE_KEY, String(visibleRowCap));
+    } catch {
+      /* ignore */
+    }
+  }, [visibleRowCap]);
 
   const shopsFiltered = useMemo(() => {
     if (searchCategoryPairs.length === 0) return shops;
@@ -95,6 +137,7 @@ export function ProductSearchPanel({
 
   const runSearch = async () => {
     setSearchError('');
+    setSelectedSearchUrls(new Set());
     setSearchLoading(true);
     const pairs = searchCategoryPairs
       .map((key) => {
@@ -176,33 +219,121 @@ export function ProductSearchPanel({
     return list;
   }, [searchResults, existingUrls, resultFilterName1, resultFilterName2, resultFilterName3, resultNegFilterName1, priceAbove, priceBelow]);
 
-  const handleSearchResultsScroll = useCallback(() => {
-    const el = searchResultsRef.current;
-    if (!el || searchLoadingMore || !searchHasMore) return;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    if (scrollTop + clientHeight >= scrollHeight - 80) {
-      loadMoreSearch();
-    }
-  }, [loadMoreSearch, searchLoadingMore, searchHasMore]);
+  const filteredSearchResultsRef = useRef<ProductWithPrice[]>([]);
+  filteredSearchResultsRef.current = filteredSearchResults;
 
   useEffect(() => {
-    // When client-side filtering (name/price/existingUrls) leaves too few items,
-    // prefetch additional pages so the panel isn't empty/near-empty.
-    if (searchLoading || searchLoadingMore || !searchHasMore) return;
-    if (searchResults.length === 0) return;
-    if (filteredSearchResults.length >= MIN_FILTERED_RESULTS) return;
-    void loadMoreSearch();
-  }, [searchLoading, searchLoadingMore, searchHasMore, searchResults.length, filteredSearchResults.length, loadMoreSearch]);
+    const onUp = () => {
+      searchSelectMouseDownRef.current = false;
+      searchDragAnchorRef.current = null;
+    };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
 
-  const handleAddAll = async () => {
-    const toAdd = filteredSearchResults.slice();
-    const moreOnServer = searchHasMore;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedSearchUrls(new Set());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (selectedSearchUrlsRef.current.size === 0) return;
+      const wrap = searchSelectionWrapRef.current;
+      if (!wrap || wrap.contains(e.target as Node)) return;
+      setSelectedSearchUrls(new Set());
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen) setSelectedSearchUrls(new Set());
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (searchResults.length === 0) setSelectedSearchUrls(new Set());
+  }, [searchResults.length]);
+
+  useEffect(() => {
+    setSelectedSearchUrls((prev) => {
+      const allowed = new Set(filteredSearchResults.map((p) => p.url));
+      const next = new Set([...prev].filter((u) => allowed.has(u)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredSearchResults]);
+
+  const applySearchRowRangeSelection = useCallback(
+    (from: number, to: number) => {
+      setSelectedSearchUrls(() => {
+        const next = new Set<string>();
+        const lo = Math.min(from, to);
+        const hi = Math.max(from, to);
+        for (let i = lo; i <= hi; i++) {
+          const row = filteredSearchResults[i];
+          if (row) next.add(row.url);
+        }
+        return next;
+      });
+    },
+    [filteredSearchResults]
+  );
+
+  const handleSearchRowMouseDown = useCallback(
+    (e: ReactMouseEvent, index: number) => {
+      if (e.button !== 0) return;
+      const t = e.target as HTMLElement;
+      if (t.closest('button, a')) return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const url = filteredSearchResults[index]?.url;
+        if (!url) return;
+        setSelectedSearchUrls((prev) => {
+          const next = new Set(prev);
+          if (next.has(url)) next.delete(url);
+          else next.add(url);
+          return next;
+        });
+        return;
+      }
+      e.preventDefault();
+      searchSelectMouseDownRef.current = true;
+      searchDragAnchorRef.current = index;
+      applySearchRowRangeSelection(index, index);
+    },
+    [filteredSearchResults, applySearchRowRangeSelection]
+  );
+
+  const handleSearchRowMouseEnter = useCallback(
+    (index: number) => {
+      if (!searchSelectMouseDownRef.current || searchDragAnchorRef.current == null) return;
+      applySearchRowRangeSelection(searchDragAnchorRef.current, index);
+    },
+    [applySearchRowRangeSelection]
+  );
+
+  const handleSelectAllVisible = useCallback(() => {
+    const rows = filteredSearchResultsRef.current;
+    if (rows.length === 0) return;
+    const visible = new Set(rows.map((p) => p.url));
+    setSelectedSearchUrls((prev) => {
+      const allOn = [...visible].every((u) => prev.has(u));
+      if (allOn) return new Set();
+      return visible;
+    });
+  }, []);
+
+  const handleAddSelected = useCallback(async () => {
+    const urls = selectedSearchUrlsRef.current;
+    const rows = filteredSearchResultsRef.current;
+    const toAdd = rows.filter((p) => urls.has(p.url));
     if (toAdd.length === 0) return;
-    await onAddAll(toAdd);
-    if (moreOnServer) {
-      await loadMoreSearch();
-    }
-  };
+    await onAddMany(toAdd);
+    setSelectedSearchUrls(new Set());
+  }, [onAddMany]);
 
   const addBlocked = addDisabled;
 
@@ -555,67 +686,125 @@ export function ProductSearchPanel({
           </div>
           {searchResults.length > 0 && (
             <>
-              <div className="search-actions">
-                <button
-                  type="button"
-                  className="btn-add-all"
-                  onClick={() => void handleAddAll()}
-                  disabled={addBlocked || filteredSearchResults.length === 0}
-                  title="Добавляет только товары, уже показанные в этом списке. Если на сервере есть ещё страницы, следующая страница загрузится автоматически."
+              <div className="search-selection-wrap" ref={searchSelectionWrapRef}>
+                <div className="search-actions search-actions--row">
+                  <button
+                    type="button"
+                    className="btn-search-select-all"
+                    onClick={handleSelectAllVisible}
+                    disabled={filteredSearchResults.length === 0}
+                    title="Выделить все строки в текущем списке (повторный клик снимает выделение)"
+                  >
+                    {selectAllVisibleLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-add-all"
+                    onClick={() => void handleAddSelected()}
+                    disabled={addBlocked || selectedSearchUrls.size === 0}
+                    title="Добавить все выделенные строки в список (мышью, Ctrl+клик или «Выбрать всё»)"
+                  >
+                    {addSelectedLabel}
+                  </button>
+                </div>
+                <div
+                  className="search-results-height-selector"
+                  role="group"
+                  aria-label="Сколько строк списка показывать"
                 >
-                  {addAllLabel}
-                </button>
-              </div>
-              <div className="search-results" ref={searchResultsRef} onScroll={handleSearchResultsScroll}>
-                {filteredSearchResults.map((p) => (
-                  <div key={p.url} className={`search-result-row ${resultRowClassName}`}>
-                    <span className="result-name">{p.product_name || p.url}</span>
-                    <div className="result-shop-stack">
-                      <span className="result-shop-main">{p.shop ?? '—'}</span>
-                      {p.category ? (
-                        <span className="result-shop-category" title={p.category}>
-                          {p.category}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="result-price-stack">
-                      <span className="result-price-main">{p.price != null ? formatPriceDisplay(p.price) : '—'}</span>
-                      {(p.price_before_discount != null || p.discount_pct != null) && (
-                        <span className="result-price-sub">
-                          {p.price_before_discount != null && (
-                            <span className="result-price-was">{formatPriceDisplay(p.price_before_discount)}</span>
-                          )}
-                          {p.discount_pct != null && (
-                            <span className="result-price-pct">
-                              {p.price_before_discount != null ? ' ' : ''}({p.discount_pct}%)
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </div>
+                  <span className="search-results-height-selector-label">Строк:</span>
+                  <div className="search-results-height-selector-btns">
                     <button
                       type="button"
-                      className="btn-add-one"
-                      onClick={() => void onAddOne(p)}
-                      disabled={addBlocked}
-                      title={addOneTitle}
+                      className={`search-results-height-btn${visibleRowCap === VISIBLE_ROWS.compact ? ' is-active' : ''}`}
+                      onClick={() => setVisibleRowCap(VISIBLE_ROWS.compact)}
+                      aria-pressed={visibleRowCap === VISIBLE_ROWS.compact}
                     >
-                      + Добавить
+                      {VISIBLE_ROWS.compact}
+                    </button>
+                    <button
+                      type="button"
+                      className={`search-results-height-btn${visibleRowCap === VISIBLE_ROWS.expanded ? ' is-active' : ''}`}
+                      onClick={() => setVisibleRowCap(VISIBLE_ROWS.expanded)}
+                      aria-pressed={visibleRowCap === VISIBLE_ROWS.expanded}
+                    >
+                      {VISIBLE_ROWS.expanded}
                     </button>
                   </div>
-                ))}
-                {searchHasMore && (
-                  <div className="search-load-more">
-                    {searchLoadingMore ? (
-                      <span className="muted">Загрузка…</span>
-                    ) : (
-                      <span className="muted">Прокрутите для загрузки</span>
+                </div>
+                <div className="search-results-stack">
+                  <div
+                    className={`search-results search-results--selectable search-results--cap-${visibleRowCap}`}
+                    ref={searchResultsRef}
+                  >
+                    {filteredSearchResults.map((p, index) => (
+                      <div
+                        key={p.url}
+                        className={[
+                          'search-result-row',
+                          resultRowClassName,
+                          selectedSearchUrls.has(p.url) ? 'search-result-row--selected' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        onMouseDown={(e) => handleSearchRowMouseDown(e, index)}
+                        onMouseEnter={() => handleSearchRowMouseEnter(index)}
+                      >
+                        <span className="result-name">{p.product_name || p.url}</span>
+                        <div className="result-shop-stack">
+                          <span className="result-shop-main">{p.shop ?? '—'}</span>
+                          {p.category ? (
+                            <span className="result-shop-category" title={p.category}>
+                              {p.category}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="result-price-stack">
+                          <span className="result-price-main">{p.price != null ? formatPriceDisplay(p.price) : '—'}</span>
+                          {(p.price_before_discount != null || p.discount_pct != null) && (
+                            <span className="result-price-sub">
+                              {p.price_before_discount != null && (
+                                <span className="result-price-was">{formatPriceDisplay(p.price_before_discount)}</span>
+                              )}
+                              {p.discount_pct != null && (
+                                <span className="result-price-pct">
+                                  {p.price_before_discount != null ? ' ' : ''}({p.discount_pct}%)
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-add-one"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={() => void onAddOne(p)}
+                          disabled={addBlocked}
+                          title={addOneTitle}
+                        >
+                          + Добавить
+                        </button>
+                      </div>
+                    ))}
+                    {filteredSearchResults.length === 0 && searchResults.length > 0 && (
+                      <p className="muted">Нет совпадений по фильтру, либо всё уже есть в {alreadyInPhrase}.</p>
                     )}
                   </div>
-                )}
-                {filteredSearchResults.length === 0 && searchResults.length > 0 && (
-                  <p className="muted">Нет совпадений по фильтру, либо всё уже есть в {alreadyInPhrase}.</p>
-                )}
+                  <div className="search-results-stack-footer">
+                    {searchHasMore ? (
+                      <button
+                        type="button"
+                        className="search-result-load-more-row"
+                        onClick={() => void loadMoreSearch()}
+                        disabled={searchLoadingMore}
+                      >
+                        {searchLoadingMore ? 'Загрузка…' : 'Загрузить ещё'}
+                      </button>
+                    ) : (
+                      <div className="search-result-load-more-slot" aria-hidden="true" />
+                    )}
+                  </div>
+                </div>
               </div>
             </>
           )}

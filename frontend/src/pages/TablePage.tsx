@@ -171,7 +171,7 @@ function TableContent({ token }: { token: string | null }) {
     handleClearTable: clearListRows,
     handleDiscardPendingChanges,
     addOneToList,
-    handleAddAllFromSearch,
+    handleAddManyFromSearch,
   } = useUserListEditor(token, { listKind: 'table' });
 
   const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading, tableToolsBusy);
@@ -578,7 +578,7 @@ function TableContent({ token }: { token: string | null }) {
         existingUrls={inListUrls}
         addDisabled={!currentListId}
         onAddOne={addOneToList}
-        onAddAll={handleAddAllFromSearch}
+        onAddMany={handleAddManyFromSearch}
       />
 
       <section className="table-section">

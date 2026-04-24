@@ -90,17 +90,8 @@ export async function searchProducts(params: {
   const orderBy = hasQ
     ? `ORDER BY CASE WHEN p.product_name ILIKE $${idx - 2} THEN 0 WHEN p.product_name ILIKE $${idx - 1} THEN 1 ELSE 2 END, p.product_name ASC NULLS LAST`
     : 'ORDER BY p.product_name ASC NULLS LAST';
+  /* Prefer today's price row; otherwise latest prior date (per product). Avoids scanning all prices. */
   const sql = `
-    WITH latest AS (
-      SELECT DISTINCT ON (pr.product_id) pr.product_id, pr.date, pr.price, pr.discount
-      FROM prices pr
-      ORDER BY pr.product_id, pr.date DESC
-    ),
-    parsed AS (
-      SELECT product_id, price,
-             NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
-      FROM latest
-    )
     SELECT
       p.url,
       p.product_name,
@@ -116,7 +107,14 @@ export async function searchProducts(params: {
         ELSE NULL
       END AS discount_pct
     FROM products p
-    LEFT JOIN parsed par ON par.product_id = p.product_id
+    LEFT JOIN LATERAL (
+      SELECT pr.price,
+             NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(pr.discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
+      FROM prices pr
+      WHERE pr.product_id = p.product_id
+      ORDER BY (pr.date = CURRENT_DATE) DESC, pr.date DESC
+      LIMIT 1
+    ) par ON true
     WHERE ${conditions.join(' AND ')}
     ${orderBy}
     LIMIT $${limitParam} OFFSET $${offsetParam}

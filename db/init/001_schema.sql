@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS prices (
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_prices_product_id ON prices(product_id);
 CREATE INDEX IF NOT EXISTS idx_prices_date ON prices(date);
+-- Search: LATERAL “today then latest” lookup per product_id
+CREATE INDEX IF NOT EXISTS idx_prices_product_id_date_desc ON prices(product_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 

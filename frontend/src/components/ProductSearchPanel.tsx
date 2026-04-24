@@ -557,8 +557,20 @@ export function ProductSearchPanel({
                 ✕
               </button>
             </div>
-            <button type="button" className="btn-primary btn-search" onClick={runSearch} disabled={searchLoading}>
-              {searchLoading ? 'Поиск…' : 'Поиск'}
+            <button
+              type="button"
+              className="btn-primary btn-search"
+              onClick={runSearch}
+              disabled={searchLoading}
+              aria-busy={searchLoading}
+              aria-label={searchLoading ? 'Поиск выполняется' : 'Поиск'}
+            >
+              <span className="btn-search-inner">
+                <span className="btn-search-label">Поиск</span>
+                <span className={`btn-search-ellipsis${searchLoading ? ' btn-search-ellipsis--visible' : ''}`} aria-hidden>
+                  …
+                </span>
+              </span>
             </button>
           </div>
           {searchError && <div className="widget-error">{searchError}</div>}

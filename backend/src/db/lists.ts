@@ -157,51 +157,69 @@ export async function getListItems(listId: string, userId: string): Promise<User
   }));
 }
 
+function rowToProductWithPrice(row: Record<string, unknown>): ProductWithPrice {
+  return {
+    url: String(row.url),
+    product_name: row.product_name != null ? String(row.product_name) : null,
+    shop: row.shop != null ? String(row.shop) : null,
+    category: row.category != null ? String(row.category) : null,
+    article: row.article != null ? String(row.article) : null,
+    price: priceToNum(row.price),
+    price_before_discount: priceToNum(row.price_before_discount),
+    discount_pct: row.discount_pct != null ? Number(row.discount_pct) : null,
+  };
+}
+
 export async function getListWithItems(listId: string, userId: string): Promise<ListWithItems | null> {
   const list = await getListById(listId, userId);
   if (!list) return null;
   const items = await getListItems(listId, userId);
+  if (items.length === 0) {
+    return { ...list, items: [] };
+  }
+
   const pool = getPool();
-  const withProducts = await Promise.all(
-    items.map(async (item) => {
-      const pr = await pool.query(
-        `WITH latest AS (
-          SELECT price, discount FROM prices WHERE product_id = $1::uuid ORDER BY date DESC LIMIT 1
-        ),
-        parsed AS (
-          SELECT price,
-                 NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
-          FROM latest
-        )
-        SELECT p.url, p.product_name, p.shop, p.category, p.article,
-               par.price::numeric AS price, par.price_before_discount,
-               CASE
-                 WHEN par.price_before_discount IS NOT NULL AND par.price_before_discount > 0
-                      AND par.price_before_discount > COALESCE(par.price, 0)
-                 THEN ROUND(((par.price_before_discount - COALESCE(par.price, 0)) / par.price_before_discount * 100)::numeric, 2)
-                 ELSE NULL
-               END AS discount_pct
-        FROM products p
-        LEFT JOIN parsed par ON true
-        WHERE p.product_id = $1::uuid`,
-        [item.product_id]
-      );
-      const row = pr.rows[0] as Record<string, unknown> | undefined;
-      const product: ProductWithPrice | undefined = row
-        ? {
-            url: String(row.url),
-            product_name: row.product_name != null ? String(row.product_name) : null,
-            shop: row.shop != null ? String(row.shop) : null,
-            category: row.category != null ? String(row.category) : null,
-            article: row.article != null ? String(row.article) : null,
-            price: priceToNum(row.price),
-            price_before_discount: priceToNum(row.price_before_discount),
-            discount_pct: row.discount_pct != null ? Number(row.discount_pct) : null,
-          }
-        : undefined;
-      return { ...item, product };
-    })
+  const productIds = items.map((i) => i.product_id);
+  const pr = await pool.query(
+    `SELECT p.product_id::text AS product_id,
+            p.url,
+            p.product_name,
+            p.shop,
+            p.category,
+            p.article,
+            par.price::numeric AS price,
+            par.price_before_discount,
+            CASE
+              WHEN par.price_before_discount IS NOT NULL AND par.price_before_discount > 0
+                   AND par.price_before_discount > COALESCE(par.price, 0)
+              THEN ROUND(((par.price_before_discount - COALESCE(par.price, 0)) / par.price_before_discount * 100)::numeric, 2)
+              ELSE NULL
+            END AS discount_pct
+     FROM products p
+     LEFT JOIN LATERAL (
+       SELECT pr.price,
+              NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(pr.discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
+       FROM prices pr
+       WHERE pr.product_id = p.product_id
+       ORDER BY (pr.date = CURRENT_DATE) DESC, pr.date DESC
+       LIMIT 1
+     ) par ON true
+     WHERE p.product_id = ANY($1::uuid[])`,
+    [productIds]
   );
+
+  const byProductId = new Map<string, ProductWithPrice>();
+  for (const raw of pr.rows) {
+    const row = raw as Record<string, unknown>;
+    const pid = String(row.product_id);
+    byProductId.set(pid, rowToProductWithPrice(row));
+  }
+
+  const withProducts = items.map((item) => ({
+    ...item,
+    product: byProductId.get(item.product_id),
+  }));
+
   return { ...list, items: withProducts };
 }
 

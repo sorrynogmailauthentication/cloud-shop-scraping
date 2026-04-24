@@ -421,6 +421,7 @@ html {
     grid-column: 1 / -1;
     width: 100%;
     justify-self: stretch;
+    justify-content: center;
   }
   .search-filter-block {
     display: grid;
@@ -459,6 +460,9 @@ html {
 .search-form .btn-search {
   height: var(--search-control-height);
   box-sizing: border-box;
+}
+.search-form .btn-primary.btn-search {
+  margin-top: 0;
 }
 .search-input {
   flex: 1;
@@ -518,6 +522,27 @@ html {
   line-height: 1;
   width: auto;
   margin: 0;
+  text-align: center;
+}
+.btn-search-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1em;
+}
+.btn-search-label {
+  flex: 0 0 auto;
+}
+/* Reserve width so «Поиск» does not shift when loading; ellipsis fades in on the right */
+.btn-search-ellipsis {
+  flex: 0 0 0.85em;
+  width: 0.85em;
+  text-align: center;
+  visibility: hidden;
+  font-weight: 600;
+}
+.btn-search-ellipsis.btn-search-ellipsis--visible {
+  visibility: visible;
 }
 .search-selection-wrap {
   display: flex;
@@ -678,10 +703,12 @@ html {
   border-top: 1px solid var(--border);
 }
 .search-result-load-more-row {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   margin: 0;
-  padding: 0.55rem calc(12px + var(--search-results-right-reserve)) 0.55rem 12px;
+  padding: 0.55rem 12px;
   font-size: 0.85rem;
   font-family: inherit;
   text-align: center;

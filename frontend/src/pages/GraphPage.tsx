@@ -201,6 +201,7 @@ function GraphContent({ token }: { token: string | null }) {
     handleDiscardPendingChanges,
     addOneToList,
     handleAddManyFromSearch,
+    listMaxItems,
   } = useUserListEditor(token, { listKind: 'graph' });
 
   const { mainBlockRef, loadingMinHeightPx } = useListMainPreservedHeight(listLoading, tableToolsBusy);
@@ -601,6 +602,7 @@ function GraphContent({ token }: { token: string | null }) {
       <ProductSearchPanel
         token={token}
         existingUrls={inListUrls}
+        listMaxItems={listMaxItems}
         addDisabled={!currentListId}
         onAddOne={addOneToList}
         onAddMany={handleAddManyFromSearch}
@@ -625,7 +627,7 @@ function GraphContent({ token }: { token: string | null }) {
               />
             </label>
             <label className="table-toolbar-field table-toolbar-field--grow">
-              <span className="table-toolbar-label">Название</span>
+              <span className="table-toolbar-label">Название нового графика</span>
               <input
                 type="text"
                 className="search-input table-toolbar-name"

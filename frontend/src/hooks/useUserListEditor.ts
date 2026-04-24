@@ -10,6 +10,7 @@ import {
   clearListItems,
 } from '../api/dashboard';
 import { useAppDialog } from '../context/AppDialogContext';
+import { listMaxItemsForKind } from '../constants/listLimits';
 
 export function rowFromSearchProduct(p: ProductWithPrice, listId: string, seq: number): UserListItem {
   return {
@@ -183,10 +184,20 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     [displayItems]
   );
 
+  const listMaxItems = listMaxItemsForKind(listKind);
+
   const addOneToList = (product: ProductWithPrice) => {
     if (!currentListId) return;
     const base = pendingItems ?? listWithItems?.items ?? [];
     if (base.some((i) => i.product_url === product.url)) return;
+    if (base.length >= listMaxItems) {
+      const where = listKind === 'graph' ? 'графике' : 'таблице';
+      void showAlert(
+        `В ${where} не более ${listMaxItems} товаров. Удалите строки из списка или выберите другой сохранённый список.`,
+        { title: 'Лимит списка' }
+      );
+      return;
+    }
     setPendingItems([...base, rowFromSearchProduct(product, currentListId, base.length)]);
   };
 
@@ -197,6 +208,7 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     let next = [...base];
     let seq = next.length;
     for (const p of products) {
+      if (next.length >= listMaxItems) break;
       if (existing.has(p.url)) continue;
       existing.add(p.url);
       next.push(rowFromSearchProduct(p, currentListId, seq));
@@ -326,5 +338,6 @@ export function useUserListEditor(token: string | null, options: UserListEditorO
     handleDiscardPendingChanges,
     addOneToList,
     handleAddManyFromSearch,
+    listMaxItems,
   };
 }

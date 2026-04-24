@@ -13,6 +13,8 @@ import type { ProductWithPrice } from '../types/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
 
 const SEARCH_PAGE_SIZE = 10;
+/** Cap chained fetches when every page is already in the table (avoid runaway loops). */
+const MAX_AUTO_SEARCH_PAGES = 500;
 const VISIBLE_ROWS = { compact: 5, expanded: 10 } as const;
 type VisibleRowCap = (typeof VISIBLE_ROWS)[keyof typeof VISIBLE_ROWS];
 const SEARCH_VISIBLE_ROWS_STORAGE_KEY = 'search:visible-rows:v1';
@@ -32,6 +34,8 @@ function readStoredVisibleRowCap(): VisibleRowCap {
 export type ProductSearchPanelProps = {
   token: string | null;
   existingUrls: Set<string>;
+  /** Max rows for this list (table vs graph). Omit to skip client-side cap in the panel. */
+  listMaxItems?: number;
   addDisabled?: boolean;
   onAddOne: (p: ProductWithPrice) => void | Promise<void>;
   /** Add multiple products (e.g. current multi-selection in search results). */
@@ -47,6 +51,7 @@ export type ProductSearchPanelProps = {
 export function ProductSearchPanel({
   token,
   existingUrls,
+  listMaxItems,
   addDisabled = false,
   onAddOne,
   onAddMany,
@@ -75,6 +80,7 @@ export function ProductSearchPanel({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [addManyFeedback, setAddManyFeedback] = useState('');
   const [visibleRowCap, setVisibleRowCap] = useState<VisibleRowCap>(readStoredVisibleRowCap);
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const searchToggleRef = useRef<HTMLButtonElement>(null);
@@ -89,6 +95,10 @@ export function ProductSearchPanel({
   const searchSelectMouseDownRef = useRef(false);
   const searchDragAnchorRef = useRef<number | null>(null);
   const searchSelectionWrapRef = useRef<HTMLDivElement>(null);
+  const existingUrlsRef = useRef(existingUrls);
+  existingUrlsRef.current = existingUrls;
+  /** Prevents overlapping load-more runs (Strict Mode / effect + click). */
+  const searchLoadMoreOngoingRef = useRef(false);
 
   useEffect(() => {
     function handleClickOutside(e: Event) {
@@ -135,7 +145,23 @@ export function ProductSearchPanel({
     );
   }, [categoryPairsFiltered, categoryFilterText]);
 
+  const listRoom = useMemo(() => {
+    if (listMaxItems == null) return Number.POSITIVE_INFINITY;
+    return Math.max(0, listMaxItems - existingUrls.size);
+  }, [listMaxItems, existingUrls]);
+
+  const listAtCapacity = listMaxItems != null && listRoom === 0;
+
+  const capacityHint = useMemo(() => {
+    if (listMaxItems == null || searchResults.length === 0 || existingUrls.size < listMaxItems) return '';
+    return `В ${alreadyInPhrase} достигнут лимит (${listMaxItems} товаров). Удалите позиции из списка или выберите другой сохранённый список.`;
+  }, [listMaxItems, searchResults.length, existingUrls, alreadyInPhrase]);
+
+  const limitStatusMessage = addManyFeedback || capacityHint;
+
   const runSearch = async () => {
+    if (!token) return;
+    setAddManyFeedback('');
     setSearchError('');
     setSelectedSearchUrls(new Set());
     setSearchLoading(true);
@@ -146,16 +172,27 @@ export function ProductSearchPanel({
       })
       .filter((p): p is { shop: string; category: string } => p != null);
     try {
-      const { products } = await searchProducts(token, {
-        q: searchQ || undefined,
-        url: searchUrl || undefined,
-        shops: searchShops.length > 0 ? searchShops : undefined,
-        pairs: pairs.length > 0 ? pairs : undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset: 0,
-      });
-      setSearchResults(products);
-      setSearchHasMore(products.length === SEARCH_PAGE_SIZE);
+      let accumulated: ProductWithPrice[] = [];
+      let pages = 0;
+      while (true) {
+        pages += 1;
+        if (pages > MAX_AUTO_SEARCH_PAGES) break;
+        const { products } = await searchProducts(token, {
+          q: searchQ || undefined,
+          url: searchUrl || undefined,
+          shops: searchShops.length > 0 ? searchShops : undefined,
+          pairs: pairs.length > 0 ? pairs : undefined,
+          limit: SEARCH_PAGE_SIZE,
+          offset: accumulated.length,
+        });
+        accumulated = accumulated.concat(products);
+        setSearchResults(accumulated);
+        const pageFull = products.length === SEARCH_PAGE_SIZE;
+        setSearchHasMore(pageFull);
+        const ex = existingUrlsRef.current;
+        const hasAnyNew = accumulated.some((p) => !ex.has(p.url));
+        if (hasAnyNew || !pageFull) break;
+      }
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : 'Ошибка поиска');
       setSearchResults([]);
@@ -167,6 +204,8 @@ export function ProductSearchPanel({
 
   const loadMoreSearch = useCallback(async () => {
     if (!token || searchLoadingMore || !searchHasMore) return;
+    if (searchLoadMoreOngoingRef.current) return;
+    searchLoadMoreOngoingRef.current = true;
     const pairs = searchCategoryPairs
       .map((key) => {
         const [shop, category] = key.split('|');
@@ -175,22 +214,53 @@ export function ProductSearchPanel({
       .filter((p): p is { shop: string; category: string } => p != null);
     setSearchLoadingMore(true);
     try {
-      const { products } = await searchProducts(token, {
-        q: searchQ || undefined,
-        url: searchUrl || undefined,
-        shops: searchShops.length > 0 ? searchShops : undefined,
-        pairs: pairs.length > 0 ? pairs : undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset: searchResults.length,
-      });
-      setSearchResults((prev) => [...prev, ...products]);
-      setSearchHasMore(products.length === SEARCH_PAGE_SIZE);
+      let merged = [...searchResults];
+      let offset = merged.length;
+      let pages = 0;
+      while (true) {
+        pages += 1;
+        if (pages > MAX_AUTO_SEARCH_PAGES) break;
+        const { products } = await searchProducts(token, {
+          q: searchQ || undefined,
+          url: searchUrl || undefined,
+          shops: searchShops.length > 0 ? searchShops : undefined,
+          pairs: pairs.length > 0 ? pairs : undefined,
+          limit: SEARCH_PAGE_SIZE,
+          offset,
+        });
+        merged = merged.concat(products);
+        setSearchResults(merged);
+        const pageFull = products.length === SEARCH_PAGE_SIZE;
+        setSearchHasMore(pageFull);
+        offset = merged.length;
+        const ex = existingUrlsRef.current;
+        const batchHasNew = products.some((p) => !ex.has(p.url));
+        if (batchHasNew || !pageFull) break;
+      }
     } catch {
       setSearchHasMore(false);
     } finally {
+      searchLoadMoreOngoingRef.current = false;
       setSearchLoadingMore(false);
     }
-  }, [token, searchQ, searchUrl, searchShops, searchCategoryPairs, searchResults.length, searchHasMore, searchLoadingMore]);
+  }, [token, searchQ, searchUrl, searchShops, searchCategoryPairs, searchResults, searchHasMore, searchLoadingMore]);
+
+  useEffect(() => {
+    if (!searchOpen || !token) return;
+    if (searchLoading || searchLoadingMore) return;
+    if (!searchHasMore || searchResults.length === 0) return;
+    if (!searchResults.every((p) => existingUrls.has(p.url))) return;
+    void loadMoreSearch();
+  }, [
+    searchOpen,
+    token,
+    searchLoading,
+    searchLoadingMore,
+    searchHasMore,
+    searchResults,
+    existingUrls,
+    loadMoreSearch,
+  ]);
 
   const filteredSearchResults = useMemo(() => {
     let list = searchResults.filter((p) => !existingUrls.has(p.url));
@@ -331,11 +401,30 @@ export function ProductSearchPanel({
     const rows = filteredSearchResultsRef.current;
     const toAdd = rows.filter((p) => urls.has(p.url));
     if (toAdd.length === 0) return;
+    const listSize = existingUrls.size;
+    if (listMaxItems != null) {
+      const room = Math.max(0, listMaxItems - listSize);
+      if (room <= 0) {
+        setAddManyFeedback(
+          `В ${alreadyInPhrase} уже максимум — ${listMaxItems} товаров. Удалите позиции из списка или выберите другой сохранённый список.`
+        );
+        return;
+      }
+      if (toAdd.length > room) {
+        setAddManyFeedback(
+          `Добавлено ${room} из ${toAdd.length}: в ${alreadyInPhrase} осталось место только для ещё ${room} товаров (лимит ${listMaxItems}).`
+        );
+        await onAddMany(toAdd.slice(0, room));
+        setSelectedSearchUrls(new Set());
+        return;
+      }
+    }
+    setAddManyFeedback('');
     await onAddMany(toAdd);
     setSelectedSearchUrls(new Set());
-  }, [onAddMany]);
+  }, [onAddMany, listMaxItems, alreadyInPhrase, existingUrls]);
 
-  const addBlocked = addDisabled;
+  const addBlocked = addDisabled || listAtCapacity;
 
   const toggleSearchOpen = useCallback(() => {
     setSearchOpen((prev) => {
@@ -714,10 +803,22 @@ export function ProductSearchPanel({
                     className="btn-add-all"
                     onClick={() => void handleAddSelected()}
                     disabled={addBlocked || selectedSearchUrls.size === 0}
-                    title="Добавить все выделенные строки в список (мышью, Ctrl+клик или «Выбрать всё»)"
+                    title={
+                      listAtCapacity && listMaxItems != null
+                        ? `Лимит ${listMaxItems} товаров в ${alreadyInPhrase}`
+                        : 'Добавить все выделенные строки в список (мышью, Ctrl+клик или «Выбрать всё»)'
+                    }
                   >
                     {addSelectedLabel}
                   </button>
+                  {limitStatusMessage ? (
+                    <p
+                      role="status"
+                      className={`search-add-all-hint${addManyFeedback ? ' search-add-all-hint--error' : ' muted'}`}
+                    >
+                      {limitStatusMessage}
+                    </p>
+                  ) : null}
                 </div>
                 <div
                   className="search-results-height-selector"
@@ -792,7 +893,11 @@ export function ProductSearchPanel({
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={() => void onAddOne(p)}
                           disabled={addBlocked}
-                          title={addOneTitle}
+                          title={
+                            listAtCapacity && listMaxItems != null
+                              ? `Лимит ${listMaxItems} товаров в ${alreadyInPhrase}`
+                              : addOneTitle
+                          }
                         >
                           + Добавить
                         </button>

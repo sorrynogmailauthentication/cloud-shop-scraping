@@ -752,8 +752,8 @@ html {
   padding: 0.4rem 0 0.4rem 12px;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
-  /* Fixed price column so a longer “(−xx%)” does not shift earlier columns. */
-  grid-template-columns: minmax(0, 1fr) minmax(9rem, 10vw) auto;
+  /* Keep content columns proportional when viewport narrows. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 .search-result-row.search-result-row--selected {
   background: rgba(240, 180, 41, 0.1);
@@ -773,7 +773,7 @@ html {
 .search-result-row--table {
   align-items: center;
   column-gap: 0.75rem;
-  grid-template-columns: minmax(0, 1fr) minmax(9rem, 10vw) minmax(5rem, 10vw) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 .search-result-row .result-name {
   min-width: 0;

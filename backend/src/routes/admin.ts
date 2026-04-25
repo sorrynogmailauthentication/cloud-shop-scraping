@@ -4,6 +4,7 @@ import { requireAdmin } from '../auth/adminMiddleware.js';
 import { signAdminToken } from '../auth/jwt.js';
 import { getPool } from '../db/index.js';
 import { getUserByEmail, setUserPaid, setUserAccessUntil } from '../db/users.js';
+import { revokeAllUserSessions } from '../db/sessions.js';
 
 const router = Router();
 
@@ -77,6 +78,24 @@ router.patch('/users/set-access', async (req: Request, res) => {
     }
     const updated = await setUserAccessUntil(user.id, value);
     return res.json({ user: { id: updated!.id, accessUntil: updated!.access_until } });
+  }
+  res.status(400).json({ error: 'Body must include id or email' });
+});
+
+router.post('/users/expire-sessions', async (req: Request, res) => {
+  const { id, email } = req.body as { id?: string; email?: string };
+  if (id) {
+    const revoked = await revokeAllUserSessions(id);
+    return res.json({ ok: true, revoked });
+  }
+  if (email) {
+    const user = await getUserByEmail(email);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const revoked = await revokeAllUserSessions(user.id);
+    return res.json({ ok: true, revoked });
   }
   res.status(400).json({ error: 'Body must include id or email' });
 });

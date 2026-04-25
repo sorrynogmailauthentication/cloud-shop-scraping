@@ -7,7 +7,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import productsRoutes from './routes/products.js';
 import meRoutes from './routes/me.js';
-import { requireAuth } from './auth/middleware.js';
+import { requireAuth, requirePaidAccess } from './auth/middleware.js';
 
 const app = express();
 
@@ -22,7 +22,7 @@ app.use(express.json());
 
 app.use('/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/products', requireAuth, productsRoutes);
+app.use('/api/products', requireAuth, requirePaidAccess, productsRoutes);
 app.use('/api/me', meRoutes);
 
 app.get('/health', (_req, res) => {

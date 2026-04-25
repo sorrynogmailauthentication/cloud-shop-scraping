@@ -4,9 +4,13 @@ import { signToken, verifyToken } from '../auth/jwt.js';
 import { config } from '../config.js';
 import type { JwtPayload } from '../types/auth.js';
 import { upsertUser } from '../db/users.js';
+import { createUserSession, revokeSessionById } from '../db/sessions.js';
+import { requireAuth } from '../auth/middleware.js';
 
 const router = Router();
 const { frontendUrl } = config;
+const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+const isProd = config.nodeEnv === 'production';
 
 router.get('/yandex', (req: Request, res) => {
   const state = (req.query.state as string) || '';
@@ -31,9 +35,11 @@ router.get('/yandex/callback', async (req: Request, res) => {
     const profile = await getYandexUser(access_token);
 
     const dbUser = await upsertUser(profile);
+    const session = await createUserSession(profile.id, SESSION_TTL_MS);
 
     const payload: JwtPayload = {
       id: profile.id,
+      sid: session.id,
       login: profile.login,
       displayName: profile.display_name || profile.real_name || profile.login,
       email: profile.default_email ?? null,
@@ -43,7 +49,14 @@ router.get('/yandex/callback', async (req: Request, res) => {
     };
 
     const token = signToken(payload);
-    res.redirect(`${frontendUrl}/#token=${encodeURIComponent(token)}`);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
+    res.redirect(frontendUrl);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Auth failed';
     console.error('Yandex auth error:', message);
@@ -51,24 +64,28 @@ router.get('/yandex/callback', async (req: Request, res) => {
   }
 });
 
-router.post('/logout', (_req, res) => {
-  res.json({ ok: true });
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token =
+      req.cookies?.token ||
+      (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null);
+    if (token) {
+      const payload = verifyToken(token);
+      if (payload?.sid) {
+        await revokeSessionById(payload.sid);
+      }
+    }
+  } catch (err) {
+    console.error('Logout error:', err);
+  } finally {
+    res.clearCookie('token', { path: '/' });
+    res.json({ ok: true });
+  }
 });
 
-router.get('/me', (req: Request, res) => {
-  const authHeader = req.headers.authorization;
-  const token =
-    req.cookies?.token ||
-    (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null);
-  if (!token) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
-  }
-  const payload = verifyToken(token);
-  if (!payload) {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
-  }
+router.get('/me', requireAuth, (req: Request, res) => {
+  const payload = req.user!;
   res.json({
     user: {
       id: payload.id,

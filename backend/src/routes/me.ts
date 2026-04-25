@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requirePaidAccess } from '../auth/middleware.js';
 import {
   getListsByUserId,
   getListById,
@@ -29,7 +29,7 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requirePaidAccess);
 
 /** GET /api/me/lists - my lists; optional ?kind=table|graph */
 router.get('/lists', async (req: Request, res: Response) => {

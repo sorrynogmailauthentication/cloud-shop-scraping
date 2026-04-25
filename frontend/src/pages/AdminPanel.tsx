@@ -20,6 +20,7 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [updatingAccessId, setUpdatingAccessId] = useState<string | null>(null);
+  const [expiringSessionsId, setExpiringSessionsId] = useState<string | null>(null);
   const navigate = useNavigate();
   const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
 
@@ -110,6 +111,33 @@ export default function AdminPanel() {
     }
   }
 
+  async function expireAllSessions(user: AdminUser) {
+    if (expiringSessionsId) return;
+    setExpiringSessionsId(user.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/expire-sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: user.id }),
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+        navigate('/admin/login', { replace: true });
+        return;
+      }
+      if (!res.ok) {
+        setError('Не удалось завершить сессии пользователя');
+      }
+    } catch {
+      setError('Ошибка сети');
+    } finally {
+      setExpiringSessionsId(null);
+    }
+  }
+
   function handleLogout() {
     sessionStorage.removeItem(ADMIN_TOKEN_KEY);
     navigate('/admin/login', { replace: true });
@@ -143,6 +171,7 @@ export default function AdminPanel() {
                   <th>Имя</th>
                   <th>Оплачено</th>
                   <th>Доступ до</th>
+                  <th>Сессии</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,6 +197,16 @@ export default function AdminPanel() {
                         onKeyDown={(e) => e.preventDefault()}
                         disabled={updatingAccessId === u.id}
                       />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-home admin-expire-btn"
+                        onClick={() => expireAllSessions(u)}
+                        disabled={expiringSessionsId === u.id}
+                      >
+                        {expiringSessionsId === u.id ? 'Завершаем…' : 'Завершить все'}
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -2,11 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { User, AuthContextValue } from '../types/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL as string || '';
-const TOKEN_KEY = 'dashboard_token';
-
-function getStoredToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
-}
+const COOKIE_AUTH_MARKER = 'cookie-auth';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -16,32 +12,12 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setTokenState] = useState<string | null>(() => getStoredToken());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const hash = window.location.hash?.slice(1) || '';
-    const params = new URLSearchParams(hash);
-    const hashToken = params.get('token');
-    if (hashToken) {
-      const decoded = decodeURIComponent(hashToken);
-      sessionStorage.setItem(TOKEN_KEY, decoded);
-      setTokenState(decoded);
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }, []);
-
   const fetchUser = useCallback(async () => {
-    const t = token || getStoredToken();
-    if (!t) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${t}` },
         credentials: 'include',
       });
       if (res.ok) {
@@ -50,8 +26,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setError(null);
       } else {
         setUser(null);
-        setTokenState(null);
-        sessionStorage.removeItem(TOKEN_KEY);
       }
     } catch (e) {
       setUser(null);
@@ -59,7 +33,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchUser();
@@ -74,8 +48,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
     } finally {
       setUser(null);
-      setTokenState(null);
-      sessionStorage.removeItem(TOKEN_KEY);
     }
   }, []);
 
@@ -83,7 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     loading,
     error,
-    token: token || getStoredToken(),
+    token: user ? COOKIE_AUTH_MARKER : null,
     loginWithYandex,
     logout,
     refreshUser: fetchUser,

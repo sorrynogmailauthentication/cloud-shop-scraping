@@ -2,7 +2,7 @@ const API_BASE = import.meta.env.VITE_API_URL as string || '';
 
 function authHeaders(token: string | null): HeadersInit {
   const h: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) h['Authorization'] = `Bearer ${token}`;
+  if (token && token !== 'cookie-auth') h['Authorization'] = `Bearer ${token}`;
   return h;
 }
 

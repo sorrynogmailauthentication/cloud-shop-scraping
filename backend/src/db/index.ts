@@ -32,9 +32,31 @@ const CREATE_TABLE = `
   );
 `;
 
+const CREATE_SESSIONS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    id UUID PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ
+  );
+`;
+
+const CREATE_SESSIONS_INDEXES = `
+  CREATE INDEX IF NOT EXISTS user_sessions_user_active_idx
+  ON user_sessions (user_id, created_at DESC)
+  WHERE revoked_at IS NULL;
+
+  CREATE INDEX IF NOT EXISTS user_sessions_expires_at_idx
+  ON user_sessions (expires_at);
+`;
+
 export async function initDb(): Promise<void> {
   const p = getPool();
   await p.query(CREATE_TABLE);
+  await p.query(CREATE_SESSIONS_TABLE);
+  await p.query(CREATE_SESSIONS_INDEXES);
   await migrateUserListsKind(p);
 }
 

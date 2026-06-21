@@ -28,7 +28,7 @@ export default function LandingPage() {
       <main className="landing-main">
         <section className="landing-hero-card">
           <div className="landing-hero-visual" aria-hidden="true">
-            <img className="landing-hero-image" src="/landing-hero.png" alt="" />
+            <img className="landing-hero-image" src="/landing-hero.webp" alt="" />
           </div>
           <div className="landing-hero-content-container">
           <div className="landing-hero-content">
@@ -181,6 +181,10 @@ export default function LandingPage() {
         </section>
 
         <section className="landing-cta-card" id="start">
+          <div className="landing-cta-visual" aria-hidden="true">
+            <img className="landing-cta-image" src="/bottom-landing.webp" alt="" />
+          </div>
+
           <div className="landing-cta-card-inner">
             <div className="landing-hero-title-box landing-cta-title-box">
               <h2>Ценалитика</h2>

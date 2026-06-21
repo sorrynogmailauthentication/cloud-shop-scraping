@@ -58,17 +58,21 @@ export default function LandingProductSearchDemo() {
               </button>
             </div>
             <div className="search-field-with-clear search-field-with-clear--shop">
-              <button type="button" className="search-dropdown-trigger" tabIndex={-1}>
-                3 магаз.
-              </button>
+              <div className="search-dropdown-wrap search-dropdown-wrap--shop">
+                <button type="button" className="search-dropdown-trigger" tabIndex={-1}>
+                  3 магаз.
+                </button>
+              </div>
               <button type="button" className="search-field-clear" tabIndex={-1} aria-hidden>
                 ✕
               </button>
             </div>
             <div className="search-field-with-clear search-field-with-clear--categories">
-              <button type="button" className="search-dropdown-trigger search-dropdown-trigger--categories" tabIndex={-1}>
-                Все категории
-              </button>
+              <div className="search-dropdown-wrap search-dropdown-wrap--categories">
+                <button type="button" className="search-dropdown-trigger search-dropdown-trigger--categories" tabIndex={-1}>
+                  Все категории
+                </button>
+              </div>
               <button type="button" className="search-field-clear" disabled tabIndex={-1} aria-hidden>
                 ✕
               </button>

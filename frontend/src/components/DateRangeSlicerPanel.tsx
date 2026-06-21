@@ -1,7 +1,8 @@
-import type { Dispatch, SetStateAction } from 'react';
-import { enforceTimelineGap } from '../utils/priceHistory';
+import { useRef, type Dispatch, type SetStateAction } from 'react';
+import { enforceTimelineGap, timelineIdxToYmd, timelineYmdToIdx } from '../utils/priceHistory';
 
 export type DateRangeSlicerPanelProps = {
+  anchorYmd: string;
   timelineMax: number;
   dateRange: { start: number; end: number };
   setDateRange: Dispatch<SetStateAction<{ start: number; end: number }>>;
@@ -12,7 +13,60 @@ export type DateRangeSlicerPanelProps = {
   error?: string | null;
 };
 
+type SlicerDateButtonProps = {
+  ymd: string;
+  label: string;
+  minYmd: string;
+  maxYmd: string;
+  pickerLabel: string;
+  onChangeYmd: (ymd: string) => void;
+};
+
+function SlicerDateButton({
+  ymd,
+  label,
+  minYmd,
+  maxYmd,
+  pickerLabel,
+  onChangeYmd,
+}: SlicerDateButtonProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const el = inputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') {
+      el.showPicker();
+    } else {
+      el.click();
+    }
+  }
+
+  return (
+    <span className="date-range-slicer-date-wrap">
+      <button type="button" className="date-range-slicer-date-btn" onClick={openPicker} aria-label={pickerLabel}>
+        <time dateTime={ymd}>{label}</time>
+      </button>
+      <input
+        ref={inputRef}
+        type="date"
+        className="date-range-slicer-date-input"
+        value={ymd}
+        min={minYmd}
+        max={maxYmd}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v) onChangeYmd(v);
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </span>
+  );
+}
+
 export function DateRangeSlicerPanel({
+  anchorYmd,
   timelineMax,
   dateRange,
   setDateRange,
@@ -22,16 +76,43 @@ export function DateRangeSlicerPanel({
   toDateLabel,
   error,
 }: DateRangeSlicerPanelProps) {
+  const minYmd = anchorYmd;
+  const maxYmd = timelineIdxToYmd(anchorYmd, timelineMax);
+
+  function pickFrom(ymd: string) {
+    const idx = timelineYmdToIdx(anchorYmd, ymd, timelineMax);
+    setDateRange((prev) => enforceTimelineGap(idx, prev.end, timelineMax));
+  }
+
+  function pickTo(ymd: string) {
+    const idx = timelineYmdToIdx(anchorYmd, ymd, timelineMax);
+    setDateRange((prev) => enforceTimelineGap(prev.start, idx, timelineMax));
+  }
+
   return (
     <div className="date-range-slicer-panel">
       <div className="date-range-slicer-panel-head">
         <span className="date-range-slicer-title">Период дат</span>
         <span className="date-range-slicer-selection" aria-live="polite">
-          <time dateTime={fromYmd}>{fromDateLabel}</time>
+          <SlicerDateButton
+            ymd={fromYmd}
+            label={fromDateLabel}
+            minYmd={minYmd}
+            maxYmd={maxYmd}
+            pickerLabel={`Выбрать начало периода, сейчас ${fromDateLabel}`}
+            onChangeYmd={pickFrom}
+          />
           <span className="date-range-slicer-arrow" aria-hidden>
             →
           </span>
-          <time dateTime={toYmd}>{toDateLabel}</time>
+          <SlicerDateButton
+            ymd={toYmd}
+            label={toDateLabel}
+            minYmd={minYmd}
+            maxYmd={maxYmd}
+            pickerLabel={`Выбрать конец периода, сейчас ${toDateLabel}`}
+            onChangeYmd={pickTo}
+          />
         </span>
       </div>
       {error ? <div className="widget-error date-range-slicer-error">{error}</div> : null}
@@ -77,11 +158,25 @@ export function DateRangeSlicerPanel({
       <div className="date-range-slicer-ticks">
         <div className="date-range-slicer-tick">
           <span className="date-range-slicer-tick-role">Начало</span>
-          <time dateTime={fromYmd}>{fromDateLabel}</time>
+          <SlicerDateButton
+            ymd={fromYmd}
+            label={fromDateLabel}
+            minYmd={minYmd}
+            maxYmd={maxYmd}
+            pickerLabel={`Выбрать начало периода, сейчас ${fromDateLabel}`}
+            onChangeYmd={pickFrom}
+          />
         </div>
         <div className="date-range-slicer-tick">
           <span className="date-range-slicer-tick-role">Конец</span>
-          <time dateTime={toYmd}>{toDateLabel}</time>
+          <SlicerDateButton
+            ymd={toYmd}
+            label={toDateLabel}
+            minYmd={minYmd}
+            maxYmd={maxYmd}
+            pickerLabel={`Выбрать конец периода, сейчас ${toDateLabel}`}
+            onChangeYmd={pickTo}
+          />
         </div>
       </div>
     </div>

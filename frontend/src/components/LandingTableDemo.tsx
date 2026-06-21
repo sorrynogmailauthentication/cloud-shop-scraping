@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DateRangeSlicerPanel } from './DateRangeSlicerPanel';
+import { TABLE_DATE_ANCHOR_YMD, formatYmdDisplay, timelineIdxToYmd } from '../utils/priceHistory';
 
 type DemoRow = {
   product: string;
@@ -119,17 +120,20 @@ function deltaClass(dir: DemoRow['deltaPriceDir'], kind: 'price' | 'pct'): strin
 export default function LandingTableDemo() {
   const timelineMax = 60;
   const [dateRange, setDateRange] = useState({ start: 0, end: timelineMax });
+  const fromYmd = timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.start);
+  const toYmd = timelineIdxToYmd(TABLE_DATE_ANCHOR_YMD, dateRange.end);
 
   return (
     <div className="landing-table-demo" aria-label="Демонстрация таблицы с периодом дат">
       <DateRangeSlicerPanel
+        anchorYmd={TABLE_DATE_ANCHOR_YMD}
         timelineMax={timelineMax}
         dateRange={dateRange}
         setDateRange={setDateRange}
-        fromYmd="2026-03-30"
-        toYmd="2026-05-29"
-        fromDateLabel="30 мар 2026"
-        toDateLabel="29 мая 2026"
+        fromYmd={fromYmd}
+        toYmd={toYmd}
+        fromDateLabel={formatYmdDisplay(fromYmd)}
+        toDateLabel={formatYmdDisplay(toYmd)}
       />
       <div className="table-wrap table-full-width landing-table-demo-scroll">
         <table className="data-table">

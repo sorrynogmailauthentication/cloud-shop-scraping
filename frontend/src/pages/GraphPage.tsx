@@ -715,6 +715,7 @@ function GraphContent({ token }: { token: string | null }) {
             <>
               {listWithItems && displayItems.length > 0 && (
                 <DateRangeSlicerPanel
+                  anchorYmd={TABLE_DATE_ANCHOR_YMD}
                   timelineMax={timelineMax}
                   dateRange={dateRange}
                   setDateRange={setDateRange}

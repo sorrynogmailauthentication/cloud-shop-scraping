@@ -505,6 +505,104 @@ html {
   padding: 1.25rem 1rem 1rem;
   background: rgba(26, 29, 35, 0.55);
 }
+.landing-demo-slot {
+  position: relative;
+  margin-top: 0.35rem;
+  padding-top: 0.5rem;
+}
+.landing-device-mockup {
+  width: 100%;
+  min-width: 0;
+  margin: 0.65rem 0 1rem;
+  padding: 0;
+}
+.landing-device-mockup-bezel {
+  border: 4px solid rgba(242, 184, 50, 0.9);
+  border-radius: 22px 22px 14px 14px;
+  background: linear-gradient(165deg, #525c6c 0%, #383f4c 40%, #252b35 100%);
+  padding: 1.1rem 1.1rem 0.9rem;
+  box-shadow:
+    0 0 0 2px rgba(242, 184, 50, 0.35),
+    0 0 48px rgba(242, 184, 50, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 32px 64px rgba(0, 0, 0, 0.55);
+}
+.landing-device-mockup-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.1rem;
+  padding: 0 0.25rem 0.7rem;
+}
+.landing-device-mockup-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6d788a;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+.landing-device-mockup-dot:first-child {
+  background: var(--landing-accent, #f2b832);
+  box-shadow: 0 0 12px rgba(242, 184, 50, 0.75);
+}
+.landing-device-mockup-dot:nth-child(2) {
+  background: #8a95a8;
+}
+.landing-device-mockup-screen {
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0.5rem;
+  background: #12151a;
+  border: 2px solid rgba(242, 184, 50, 0.35);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65),
+    inset 0 3px 18px rgba(0, 0, 0, 0.45);
+}
+.landing-device-mockup-chin {
+  height: 16px;
+  width: min(74%, 580px);
+  margin: 4px auto 0;
+  background: linear-gradient(180deg, #454d5c 0%, #2a303a 100%);
+  border: 2px solid rgba(242, 184, 50, 0.45);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.landing-device-mockup-stand {
+  width: min(38%, 280px);
+  height: 24px;
+  margin: 4px auto 0;
+  background: linear-gradient(180deg, #3a424f 0%, #1a1f28 100%);
+  border: 2px solid rgba(242, 184, 50, 0.35);
+  border-top: none;
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+.landing-device-mockup--wide .landing-device-mockup-bezel {
+  padding: 1.15rem 1.15rem 0.95rem;
+}
+.landing-device-mockup--chart .landing-device-mockup-screen {
+  min-height: calc(400px + 1rem);
+  box-sizing: border-box;
+}
+.landing-device-mockup-screen > * {
+  border-radius: 6px;
+  overflow: hidden;
+}
+.landing-demo-slot .landing-monitor-table-label {
+  z-index: 1;
+  top: 0;
+  left: 1.75rem;
+}
+.landing-formats-layout .landing-device-mockup {
+  margin-top: 0;
+  margin-bottom: 0.85rem;
+  margin-left: 0;
+}
 .landing-monitor-table-label {
   position: absolute;
   top: -0.65rem;
@@ -524,7 +622,8 @@ html {
 }
 .landing-search-demo .search-panel {
   margin-bottom: 0;
-  border-color: var(--border);
+  border: none;
+  border-radius: 0;
   background: var(--surface);
 }
 .landing-search-demo .search-panel-toggle {
@@ -563,6 +662,10 @@ html {
   min-height: 0;
   overflow: hidden;
 }
+.landing-search-demo .search-results-stack-footer,
+.landing-search-demo .search-result-load-more-slot {
+  display: none;
+}
 .landing-table-demo {
   pointer-events: none;
   user-select: none;
@@ -572,8 +675,7 @@ html {
   margin-bottom: 1rem;
 }
 .landing-table-demo-scroll {
-  max-height: 420px;
-  overflow: auto;
+  overflow: hidden;
 }
 .landing-table-demo .table-link {
   cursor: default;
@@ -645,18 +747,6 @@ html {
   flex-shrink: 0;
   line-height: 1.35;
 }
-.landing-formats-section .landing-monitor-table-wrap {
-  padding: 0.65rem 0.75rem 0.75rem;
-}
-.landing-formats-chart-wrap {
-  position: relative;
-  border: 1.5px solid var(--landing-accent);
-  border-radius: 18px;
-  padding: 0.45rem 0.5rem 0.5rem;
-  background: rgba(26, 29, 35, 0.55);
-  min-width: 0;
-  overflow: hidden;
-}
 .landing-graph-demo {
   pointer-events: none;
   user-select: none;
@@ -684,6 +774,13 @@ html {
   }
   .landing-formats-layout {
     grid-template-columns: 1fr;
+  }
+  .landing-formats-layout .landing-device-mockup {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .landing-device-mockup {
+    margin: 0.5rem 0 0.85rem;
   }
   .landing-formats-title {
     white-space: normal;

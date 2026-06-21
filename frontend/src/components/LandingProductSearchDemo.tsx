@@ -184,10 +184,10 @@ export default function LandingProductSearchDemo() {
             <div className="search-results-height-selector" role="group" aria-label="Сколько строк списка показывать">
               <span className="search-results-height-selector-label">Строк:</span>
               <div className="search-results-height-selector-btns">
-                <button type="button" className="search-results-height-btn" tabIndex={-1}>
+                <button type="button" className="search-results-height-btn is-active" tabIndex={-1}>
                   5
                 </button>
-                <button type="button" className="search-results-height-btn is-active" tabIndex={-1}>
+                <button type="button" className="search-results-height-btn" tabIndex={-1}>
                   10
                 </button>
               </div>
@@ -215,9 +215,6 @@ export default function LandingProductSearchDemo() {
                     </button>
                   </div>
                 ))}
-              </div>
-              <div className="search-results-stack-footer">
-                <div className="search-result-load-more-slot" aria-hidden="true" />
               </div>
             </div>
           </div>

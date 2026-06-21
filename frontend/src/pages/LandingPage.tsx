@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import LandingProductSearchDemo from '../components/LandingProductSearchDemo';
 import LandingTableDemo from '../components/LandingTableDemo';
 import LandingGraphDemo, { LandingFormatsSidebar } from '../components/LandingGraphDemo';
+import LandingDeviceMockup from '../components/LandingDeviceMockup';
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
@@ -105,11 +106,10 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="landing-monitor-table-wrap">
-            <span className="landing-monitor-table-label">Таблица</span>
-            <div className="landing-monitor-table-inner">
+          <div className="landing-demo-slot">
+            <LandingDeviceMockup>
               <LandingProductSearchDemo />
-            </div>
+            </LandingDeviceMockup>
           </div>
         </section>
 
@@ -146,11 +146,9 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="landing-monitor-table-wrap landing-monitor-table-wrap--plain">
-            <div className="landing-monitor-table-inner">
-              <LandingTableDemo />
-            </div>
-          </div>
+          <LandingDeviceMockup className="landing-device-mockup--wide">
+            <LandingTableDemo />
+          </LandingDeviceMockup>
         </section>
 
         <section className="landing-formats-section" id="formats">
@@ -174,9 +172,9 @@ export default function LandingPage() {
           <div className="landing-formats-layout">
             <LandingFormatsSidebar />
 
-            <div className="landing-formats-chart-wrap">
+            <LandingDeviceMockup className="landing-device-mockup--chart">
               <LandingGraphDemo />
-            </div>
+            </LandingDeviceMockup>
           </div>
         </section>
 

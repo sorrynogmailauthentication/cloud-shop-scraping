@@ -9,7 +9,7 @@ function todayStr(): string {
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const isDashboard = location.pathname === '/' || location.pathname === '/graph';
+  const isDashboard = location.pathname === '/table' || location.pathname === '/graph';
   const scrollByPath = useRef<Record<string, number>>({});
 
   useLayoutEffect(() => {
@@ -43,9 +43,9 @@ export default function Layout() {
     <div className="layout">
       <header className="header">
         <div className="header-inner">
-          <span className="logo">Ценалитика</span>
+          <span className="logo"><NavLink to="/landing" className="logo-link">Ценалитика</NavLink></span>
           <nav className="header-nav">
-            <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')} end>
+            <NavLink to="/table" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')} end>
               Таблица
             </NavLink>
             <NavLink to="/graph" className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}>

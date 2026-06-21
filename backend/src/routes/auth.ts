@@ -56,7 +56,7 @@ router.get('/yandex/callback', async (req: Request, res) => {
       maxAge: SESSION_TTL_MS,
       path: '/',
     });
-    res.redirect(frontendUrl);
+    res.redirect(`${frontendUrl}/table`);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Auth failed';
     console.error('Yandex auth error:', message);

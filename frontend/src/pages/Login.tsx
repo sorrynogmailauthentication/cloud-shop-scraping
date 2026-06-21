@@ -11,7 +11,7 @@ export default function Login() {
   const queryError = searchParams.get('error');
 
   useEffect(() => {
-    if (!loading && user) navigate('/', { replace: true });
+    if (!loading && user) navigate('/table', { replace: true });
   }, [user, loading, navigate]);
 
   const err = queryError || error;

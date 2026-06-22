@@ -50,7 +50,7 @@ export default function AdminLogin() {
             {error}
           </div>
         )}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <input
             type="text"
             placeholder="Логин"

@@ -11,6 +11,7 @@ import { fetchShops, fetchShopCategoryPairs, searchProducts } from '../api/dashb
 import type { ShopCategoryPair } from '../api/dashboard';
 import type { ProductWithPrice } from '../types/dashboard';
 import { formatPriceDisplay } from '../utils/priceHistory';
+import { noAutofill } from '../utils/noAutofill';
 
 const SEARCH_PAGE_SIZE = 10;
 /** Cap chained fetches when every page is already in the table (avoid runaway loops). */
@@ -465,9 +466,10 @@ export function ProductSearchPanel({
       </button>
       {searchOpen && (
         <div className="search-panel-inner">
-          <div className="search-form">
+          <form className="search-form" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
             <div className="search-field-with-clear search-field-with-clear--name">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Название (часть)"
                 value={searchQ}
@@ -504,6 +506,7 @@ export function ProductSearchPanel({
                   <div className="search-dropdown-panel">
                     <label className="search-dropdown-option search-dropdown-all">
                       <input
+                        {...noAutofill}
                         type="checkbox"
                         checked={searchShops.length === 0}
                         onChange={() => setSearchShops([])}
@@ -513,6 +516,7 @@ export function ProductSearchPanel({
                     {shopsFiltered.map((s) => (
                       <label key={s} className="search-dropdown-option">
                         <input
+                          {...noAutofill}
                           type="checkbox"
                           checked={searchShops.includes(s)}
                           onChange={() => {
@@ -562,6 +566,7 @@ export function ProductSearchPanel({
                   <div className="search-dropdown-panel search-dropdown-panel--categories">
                     <div className="search-dropdown-filter-wrap">
                       <input
+                        {...noAutofill}
                         type="text"
                         className="search-dropdown-filter-input"
                         placeholder="Фильтр категорий"
@@ -581,6 +586,7 @@ export function ProductSearchPanel({
                     </div>
                     <label className="search-dropdown-option search-dropdown-all">
                       <input
+                        {...noAutofill}
                         type="checkbox"
                         checked={searchCategoryPairs.length === 0}
                         onChange={() => setSearchCategoryPairs([])}
@@ -592,6 +598,7 @@ export function ProductSearchPanel({
                       return (
                         <label key={key} className="search-dropdown-option">
                           <input
+                            {...noAutofill}
                             type="checkbox"
                             checked={searchCategoryPairs.includes(key)}
                             onChange={() => {
@@ -628,6 +635,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--url">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Ссылка (часть)"
                 value={searchUrl}
@@ -661,11 +669,12 @@ export function ProductSearchPanel({
                 </span>
               </span>
             </button>
-          </div>
+          </form>
           {searchError && <div className="widget-error">{searchError}</div>}
-          <div className="search-filter-block">
+          <form className="search-filter-block" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Название содержит (1)"
                 value={resultFilterName1}
@@ -685,6 +694,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Название содержит (2)"
                 value={resultFilterName2}
@@ -704,6 +714,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Название содержит (3)"
                 value={resultFilterName3}
@@ -723,6 +734,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 placeholder="Название не содержит (1)"
                 value={resultNegFilterName1}
@@ -742,6 +754,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-num">
               <input
+                {...noAutofill}
                 type="number"
                 placeholder="Цена от (мин.)"
                 value={priceAbove}
@@ -764,6 +777,7 @@ export function ProductSearchPanel({
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-num">
               <input
+                {...noAutofill}
                 type="number"
                 placeholder="Цена до (макс.)"
                 value={priceBelow}
@@ -784,7 +798,7 @@ export function ProductSearchPanel({
                 ✕
               </button>
             </div>
-          </div>
+          </form>
           {searchResults.length > 0 && (
             <>
               <div className="search-selection-wrap" ref={searchSelectionWrapRef}>

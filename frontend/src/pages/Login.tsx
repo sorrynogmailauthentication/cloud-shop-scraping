@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { noAutofill } from '../utils/noAutofill';
 
 export default function Login() {
   
@@ -40,6 +41,7 @@ export default function Login() {
         </button>
         <label className="login-consent">
           <input
+            {...noAutofill}
             type="checkbox"
             checked={consentAccepted}
             onChange={(e) => setConsentAccepted(e.target.checked)}

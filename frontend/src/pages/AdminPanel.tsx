@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ADMIN_TOKEN_KEY } from './AdminLogin';
+import { noAutofill } from '../utils/noAutofill';
 
 const API_BASE = import.meta.env.VITE_API_URL as string || '';
 
@@ -182,6 +183,7 @@ export default function AdminPanel() {
                     <td>{u.display_name ?? '—'}</td>
                     <td>
                       <input
+                        {...noAutofill}
                         type="checkbox"
                         checked={Boolean(u.is_paid)}
                         onChange={() => togglePaid(u)}
@@ -190,6 +192,7 @@ export default function AdminPanel() {
                     </td>
                     <td>
                       <input
+                        {...noAutofill}
                         type="date"
                         className="admin-date-input"
                         value={u.access_until ?? ''}

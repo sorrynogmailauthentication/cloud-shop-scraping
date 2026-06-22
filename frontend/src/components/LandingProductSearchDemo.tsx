@@ -1,3 +1,5 @@
+import { noAutofill } from '../utils/noAutofill';
+
 const DEMO_RESULTS = [
   {
     name: 'Яйцо «Kinder» сюрприз Maxi в ассортименте, 100 г',
@@ -43,9 +45,10 @@ export default function LandingProductSearchDemo() {
           ▼ Скрыть поиск
         </button>
         <div className="search-panel-inner">
-          <div className="search-form">
+          <form className="search-form" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
             <div className="search-field-with-clear search-field-with-clear--name">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-input-name"
                 defaultValue="яйцо"
@@ -79,6 +82,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--url">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-input-url"
                 placeholder="Ссылка (часть)"
@@ -95,11 +99,12 @@ export default function LandingProductSearchDemo() {
                 <span className="btn-search-label">Поиск</span>
               </span>
             </button>
-          </div>
+          </form>
 
-          <div className="search-filter-block">
+          <form className="search-filter-block" autoComplete="off" onSubmit={(e) => e.preventDefault()}>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-filter-text"
                 placeholder="Название содержит (1)"
@@ -112,6 +117,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-filter-text"
                 placeholder="Название содержит (2)"
@@ -124,6 +130,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-filter-text"
                 placeholder="Название содержит (3)"
@@ -136,6 +143,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-text">
               <input
+                {...noAutofill}
                 type="text"
                 className="search-input search-filter-text"
                 placeholder="Название не содержит (1)"
@@ -148,6 +156,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-num">
               <input
+                {...noAutofill}
                 type="number"
                 className="search-input search-input-num"
                 placeholder="Цена от (мин.)"
@@ -160,6 +169,7 @@ export default function LandingProductSearchDemo() {
             </div>
             <div className="search-field-with-clear search-field-with-clear--filter-num">
               <input
+                {...noAutofill}
                 type="number"
                 className="search-input search-input-num"
                 placeholder="Цена до (макс.)"
@@ -170,7 +180,7 @@ export default function LandingProductSearchDemo() {
                 ✕
               </button>
             </div>
-          </div>
+          </form>
 
           <div className="search-selection-wrap">
             <div className="search-actions search-actions--row">

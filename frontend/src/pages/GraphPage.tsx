@@ -32,6 +32,7 @@ import {
   timelineYmdToIdx,
   timelineMaxIdx,
 } from '../utils/priceHistory';
+import { noAutofill } from '../utils/noAutofill';
 import { obscureProductDisplayName } from '../utils/productDisplay';
 import { priceChartYDomain, Y_AXIS_TICK_COUNT, YAxisTickHideTopLabel } from '../utils/chartAxis';
 import { CHART_SERIES_COLORS, chartSeriesStrokeDash } from '../utils/chartColors';
@@ -635,7 +636,7 @@ function GraphContent({ token }: { token: string | null }) {
                 onChange={(e) => setSaveTableName(e.target.value)}
                 placeholder="график 1"
                 disabled={tableToolsBusy}
-                autoComplete="off"
+                {...noAutofill}
               />
             </label>
             <div className="table-toolbar-actions">

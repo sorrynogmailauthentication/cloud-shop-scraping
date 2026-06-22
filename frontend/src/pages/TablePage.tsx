@@ -22,6 +22,7 @@ import {
   formatPriceDisplay,
   formatYmdDisplay,
 } from '../utils/priceHistory';
+import { noAutofill } from '../utils/noAutofill';
 
 const TABLE_DATE_RANGE_STORAGE_KEY = 'table:date-range:v1';
 const TABLE_DEFAULT_START_YMD = '2026-03-29';
@@ -607,7 +608,7 @@ function TableContent({ token }: { token: string | null }) {
                 onChange={(e) => setSaveTableName(e.target.value)}
                 placeholder="таблица 1"
                 disabled={tableToolsBusy}
-                autoComplete="off"
+                {...noAutofill}
               />
             </label>
             <div className="table-toolbar-actions">

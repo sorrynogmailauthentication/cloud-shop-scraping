@@ -1,5 +1,6 @@
 import { useRef, type Dispatch, type SetStateAction } from 'react';
 import { enforceTimelineGap, timelineIdxToYmd, timelineYmdToIdx } from '../utils/priceHistory';
+import { noAutofill } from '../utils/noAutofill';
 
 export type DateRangeSlicerPanelProps = {
   anchorYmd: string;
@@ -48,6 +49,7 @@ function SlicerDateButton({
         <time dateTime={ymd}>{label}</time>
       </button>
       <input
+        {...noAutofill}
         ref={inputRef}
         type="date"
         className="date-range-slicer-date-input"
@@ -92,7 +94,7 @@ export function DateRangeSlicerPanel({
   return (
     <div className="date-range-slicer-panel">
       <div className="date-range-slicer-panel-head">
-        <span className="date-range-slicer-title">Период дат</span>
+        <span className="date-range-slicer-title">Временной отрезок</span>
         <span className="date-range-slicer-selection" aria-live="polite">
           <SlicerDateButton
             ymd={fromYmd}
@@ -131,6 +133,7 @@ export function DateRangeSlicerPanel({
           }
         />
         <input
+          {...noAutofill}
           type="range"
           className="date-range-slicer-thumb date-range-slicer-thumb--from"
           min={0}
@@ -143,6 +146,7 @@ export function DateRangeSlicerPanel({
           aria-label={`Начало периода, ${fromDateLabel}`}
         />
         <input
+          {...noAutofill}
           type="range"
           className="date-range-slicer-thumb date-range-slicer-thumb--to"
           min={0}

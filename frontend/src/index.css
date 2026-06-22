@@ -24,6 +24,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+input[autocomplete='off']::-webkit-contacts-auto-fill-button,
+input[autocomplete='off']::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;
@@ -672,7 +679,7 @@ html {
   min-width: 0;
 }
 .landing-table-demo .date-range-slicer-panel {
-  margin-bottom: 1rem;
+  margin-bottom: 1.1rem;
 }
 .landing-table-demo-scroll {
   overflow: hidden;
@@ -1639,32 +1646,36 @@ html {
 }
 
 .date-range-slicer-panel {
-  --slicer-inset: 6px;
-  --slicer-track-h: 2px;
-  --slicer-thumb: 10px;
-  margin-bottom: 0.75rem;
-  max-width: 560px;
+  --slicer-inset: 10px;
+  --slicer-track-h: 7px;
+  --slicer-thumb: 20px;
+  margin-bottom: 1.1rem;
+  max-width: 100%;
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
 }
 .date-range-slicer-panel-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: 0.35rem 0.6rem;
-  margin-bottom: 0.35rem;
+  gap: 0.5rem 0.85rem;
+  margin-bottom: 0.75rem;
 }
 .date-range-slicer-title {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--muted);
-  letter-spacing: 0.02em;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
 }
 .date-range-slicer-selection {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.35rem 0.45rem;
-  font-size: 0.85rem;
-  font-weight: 500;
+  gap: 0.45rem 0.55rem;
+  font-size: 1rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
@@ -1676,23 +1687,25 @@ html {
   display: inline-flex;
 }
 .date-range-slicer-date-btn {
-  padding: 0.1rem 0.15rem;
+  padding: 0.2rem 0.45rem;
   margin: 0;
   border: none;
   background: none;
   font: inherit;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: inherit;
   cursor: pointer;
   border-radius: 4px;
   text-decoration: underline;
-  text-decoration-color: rgba(242, 184, 50, 0.35);
-  text-underline-offset: 2px;
+  text-decoration-color: rgba(242, 184, 50, 0.55);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
 }
 .date-range-slicer-date-btn:hover,
 .date-range-slicer-date-btn:focus-visible {
   color: var(--accent);
+  background: rgba(240, 180, 41, 0.1);
   text-decoration-color: var(--accent);
   outline: none;
 }
@@ -1721,29 +1734,31 @@ html {
 }
 .date-range-slicer {
   position: relative;
-  height: 28px;
+  height: 44px;
   width: 100%;
+  padding: 0 2px;
+  margin-bottom: 0.15rem;
 }
 .date-range-slicer-rail {
   position: absolute;
-  left: var(--slicer-inset, 6px);
-  right: var(--slicer-inset, 6px);
+  left: var(--slicer-inset, 8px);
+  right: var(--slicer-inset, 8px);
   top: 50%;
-  height: var(--slicer-track-h, 2px);
-  margin-top: calc(var(--slicer-track-h, 2px) / -2);
-  background: var(--border);
-  border-radius: 1px;
+  height: var(--slicer-track-h, 6px);
+  margin-top: calc(var(--slicer-track-h, 6px) / -2);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
   pointer-events: none;
-  opacity: 0.85;
 }
 .date-range-slicer-fill {
   position: absolute;
   top: 50%;
-  margin-top: calc(var(--slicer-track-h, 2px) / -2);
-  height: var(--slicer-track-h, 2px);
-  border-radius: 1px;
+  margin-top: calc(var(--slicer-track-h, 6px) / -2);
+  height: var(--slicer-track-h, 6px);
+  border-radius: 999px;
   background: var(--accent);
-  opacity: 0.35;
+  box-shadow: 0 0 10px rgba(240, 180, 41, 0.35);
   pointer-events: none;
   min-width: 0;
 }
@@ -1751,7 +1766,7 @@ html {
   position: absolute;
   left: 0;
   width: 100%;
-  height: 28px;
+  height: 44px;
   margin: 0;
   padding: 0;
   background: none;
@@ -1763,13 +1778,19 @@ html {
   outline: none;
 }
 .date-range-slicer-thumb:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 .date-range-slicer-thumb:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 .date-range-slicer-thumb::-webkit-slider-runnable-track {
-  height: var(--slicer-track-h, 2px);
+  height: var(--slicer-track-h, 6px);
   background: transparent;
   border: none;
 }
@@ -1777,39 +1798,52 @@ html {
   -webkit-appearance: none;
   appearance: none;
   pointer-events: auto;
-  width: var(--slicer-thumb, 10px);
-  height: var(--slicer-thumb, 10px);
-  margin-top: calc((var(--slicer-track-h, 2px) - var(--slicer-thumb, 10px)) / 2);
+  width: var(--slicer-thumb, 18px);
+  height: var(--slicer-thumb, 18px);
+  margin-top: calc((var(--slicer-track-h, 6px) - var(--slicer-thumb, 18px)) / 2);
   border-radius: 50%;
-  background: var(--text);
-  border: none;
-  box-shadow: none;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow:
+    0 0 0 1px rgba(240, 180, 41, 0.65),
+    0 2px 8px rgba(0, 0, 0, 0.35);
   cursor: grab;
 }
 .date-range-slicer-thumb::-webkit-slider-thumb:hover {
-  background: var(--accent);
+  background: var(--accent-hover);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 12px rgba(240, 180, 41, 0.45),
+    0 2px 10px rgba(0, 0, 0, 0.4);
 }
 .date-range-slicer-thumb::-webkit-slider-thumb:active {
   cursor: grabbing;
   background: var(--accent-hover);
+  transform: scale(1.08);
 }
 .date-range-slicer-thumb::-moz-range-track {
-  height: var(--slicer-track-h, 2px);
+  height: var(--slicer-track-h, 6px);
   background: transparent;
   border: none;
 }
 .date-range-slicer-thumb::-moz-range-thumb {
   pointer-events: auto;
-  width: var(--slicer-thumb, 10px);
-  height: var(--slicer-thumb, 10px);
+  width: var(--slicer-thumb, 18px);
+  height: var(--slicer-thumb, 18px);
   border-radius: 50%;
-  background: var(--text);
-  border: none;
-  box-shadow: none;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow:
+    0 0 0 1px rgba(240, 180, 41, 0.65),
+    0 2px 8px rgba(0, 0, 0, 0.35);
   cursor: grab;
 }
 .date-range-slicer-thumb::-moz-range-thumb:hover {
-  background: var(--accent);
+  background: var(--accent-hover);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 12px rgba(240, 180, 41, 0.45),
+    0 2px 10px rgba(0, 0, 0, 0.4);
 }
 .date-range-slicer-thumb::-moz-range-thumb:active {
   cursor: grabbing;
@@ -1825,15 +1859,15 @@ html {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
-  margin-top: 0.35rem;
+  gap: 1rem;
+  margin-top: 0.55rem;
   padding: 0 var(--slicer-inset);
   font-variant-numeric: tabular-nums;
 }
 .date-range-slicer-tick {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.2rem;
   min-width: 0;
 }
 .date-range-slicer-tick:first-child {
@@ -1845,14 +1879,15 @@ html {
   text-align: right;
 }
 .date-range-slicer-tick-role {
-  font-size: 0.68rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
 }
 .date-range-slicer-tick time {
-  font-size: 0.8rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--text);
 }
 .table-delta {

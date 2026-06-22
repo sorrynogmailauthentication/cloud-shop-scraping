@@ -140,7 +140,7 @@ export default function LandingTableDemo() {
           <thead>
             <tr>
               <th>Товар</th>
-              <th>Ссылка</th>
+              <th className="landing-table-demo-col-link">Ссылка</th>
               <th className="table-col-shop">Магазин</th>
               <th className="table-col-category">Категория</th>
               <th className="table-col-num">
@@ -155,8 +155,8 @@ export default function LandingTableDemo() {
               <th className="table-col-pct">
                 <abbr title="Процентное изменение">Δ %</abbr>
               </th>
-              <th className="table-col-num">До скидки</th>
-              <th className="table-col-pct">Скидка %</th>
+              <th className="table-col-num landing-table-demo-col-discount">До скидки</th>
+              <th className="table-col-pct landing-table-demo-col-discount">Скидка %</th>
               <th className="sort-th--narrow" aria-label="Удалить" />
             </tr>
           </thead>
@@ -166,7 +166,7 @@ export default function LandingTableDemo() {
                 <td className="table-col-product" title={row.product}>
                   {row.product}
                 </td>
-                <td>
+                <td className="landing-table-demo-col-link">
                   <span className="table-link">Ссылка</span>
                 </td>
                 <td className="cell-wrap table-col-shop">{row.shop}</td>
@@ -175,8 +175,8 @@ export default function LandingTableDemo() {
                 <td className="table-col-num">{row.priceEnd}</td>
                 <td className={deltaClass(row.deltaPriceDir, 'price')}>{row.deltaPrice}</td>
                 <td className={deltaClass(row.deltaPctDir, 'pct')}>{row.deltaPct}</td>
-                <td className="table-col-num">{row.beforeDiscount}</td>
-                <td className="table-col-pct">{row.discountPct}</td>
+                <td className="table-col-num landing-table-demo-col-discount">{row.beforeDiscount}</td>
+                <td className="table-col-pct landing-table-demo-col-discount">{row.discountPct}</td>
                 <td>
                   <button type="button" className="btn-remove" tabIndex={-1} aria-hidden>
                     ✕

@@ -189,6 +189,7 @@ html {
   border-radius: 22px;
   margin: 3rem 20% 3rem 25%;
   width: min(600px, 52vw, 700px);
+  max-width: calc(100% - 2rem);
 }
 
 .landing-main {
@@ -247,12 +248,14 @@ html {
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: -0.02em;
+  overflow-wrap: break-word;
 }
 .landing-hero-title-box p {
   margin: 0;
   font-size: clamp(1rem, 2vw, 1.35rem);
   font-weight: 500;
   line-height: 1.35;
+  overflow-wrap: break-word;
 }
 .landing-hero-arrow-bar {
   display: flex;
@@ -688,6 +691,13 @@ html {
   cursor: default;
 }
 
+@media (min-width: 641px) and (max-width: 960px) {
+  .landing-table-demo .landing-table-demo-col-link,
+  .landing-table-demo .landing-table-demo-col-discount {
+    display: none;
+  }
+}
+
 /* Landing — formats / graph section */
 .landing-formats-title {
   white-space: nowrap;
@@ -801,24 +811,88 @@ html {
   }
 }
 
+@media (max-width: 900px) {
+  .landing-hero-content-container {
+    margin: 2rem 1.25rem 2rem;
+    width: auto;
+    max-width: min(560px, calc(100% - 2.5rem));
+  }
+}
+
 @media (max-width: 640px) {
+  .landing-main {
+    padding: 1.25rem 1rem 3rem;
+  }
   .landing-hero-card {
-    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: clamp(300px, 88vw, 380px);
     border-radius: 20px;
+    margin-bottom: 2rem;
+  }
+  .landing-hero-image {
+    object-position: 58% 35%;
+  }
+  .landing-hero-content-container {
+    margin: 0 0.75rem 0.85rem;
+    width: auto;
+    max-width: none;
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+    background: rgba(26, 29, 35, 0.72);
   }
   .landing-hero-content {
     max-width: 100%;
-    padding-bottom: 5rem;
+    padding: 0.85rem 0.95rem 0.95rem;
+    gap: 0.75rem;
   }
   .landing-hero-title-box {
-    border-radius: 18px;
+    width: 100%;
+    border-radius: 14px;
+    padding: 0.95rem 1rem;
+  }
+  .landing-hero-title-box h1 {
+    font-size: clamp(1.55rem, 7.5vw, 2.1rem);
+    line-height: 1.08;
+    margin-bottom: 0.3rem;
+  }
+  .landing-hero-title-box p {
+    font-size: clamp(0.88rem, 3.8vw, 1.05rem);
+    line-height: 1.4;
   }
   .landing-hero-arrow-bar {
     width: 100%;
+    padding: 0.55rem 0.85rem;
   }
-  .landing-hero-corner-btn {
-    width: 46px;
-    height: 46px;
+  .landing-hero-actions {
+    width: 100%;
+    gap: 0.55rem;
+  }
+  .landing-hero-actions .landing-btn-ghost {
+    display: none;
+  }
+  .landing-hero-actions .landing-btn-lg {
+    flex: 1 1 100%;
+    min-width: 0;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.92rem;
+  }
+  .landing-hero-corner-btn,
+  .landing-monitor-corner-btn {
+    display: none;
+  }
+  .landing-monitor-head {
+    padding-right: 0;
+    padding-top: 0;
+  }
+  .landing-demo-slot,
+  .landing-device-mockup {
+    display: none;
+  }
+  .landing-integration-section,
+  .landing-formats-section {
+    margin-top: 2rem;
   }
 }
 

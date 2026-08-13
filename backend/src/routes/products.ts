@@ -1,5 +1,26 @@
 import { Router, type Request, type Response } from 'express';
-import { searchProducts, getPriceHistory, getShops, getShopCategoryPairs } from '../db/products.js';
+import {
+  searchProducts,
+  getPriceHistory,
+  getClosestPricesForUrls,
+  getShops,
+  getShopCategoryPairs,
+} from '../db/products.js';
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_PRICE_AT_URLS = 120;
+
+function parseDateRange(
+  fromRaw: unknown,
+  toRaw: unknown
+): { from: string; to: string } | { error: string } {
+  const from = typeof fromRaw === 'string' ? fromRaw : null;
+  const to = typeof toRaw === 'string' ? toRaw : null;
+  if (!from || !to) return { error: 'from and to (YYYY-MM-DD) are required' };
+  if (!DATE_RE.test(from) || !DATE_RE.test(to)) return { error: 'from and to must be YYYY-MM-DD' };
+  if (from > to) return { error: 'from must be <= to' };
+  return { from, to };
+}
 
 const router = Router();
 
@@ -70,6 +91,33 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+/** POST /api/products/prices/at - closest price at from/to for many products (one SQL). */
+router.post('/prices/at', async (req: Request, res: Response) => {
+  const rawUrls = req.body?.product_urls;
+  const productUrls = Array.isArray(rawUrls)
+    ? rawUrls.map((u: unknown) => String(u).trim()).filter(Boolean)
+    : [];
+  const dates = parseDateRange(req.body?.from, req.body?.to);
+
+  if (productUrls.length === 0) {
+    res.status(400).json({ error: 'At least one product_url is required' });
+    return;
+  }
+  if ('error' in dates) {
+    res.status(400).json({ error: dates.error });
+    return;
+  }
+  const uniqueUrls = [...new Set(productUrls)].slice(0, MAX_PRICE_AT_URLS);
+
+  try {
+    const results = await getClosestPricesForUrls(uniqueUrls, dates.from, dates.to);
+    res.json({ results });
+  } catch (err) {
+    console.error('Closest prices error:', err);
+    res.status(500).json({ error: 'Failed to load prices' });
+  }
+});
+
 /** GET /api/products/prices?product_url=...&from=YYYY-MM-DD&to=YYYY-MM-DD - one product. */
 /** GET /api/products/prices?product_url=...&product_url=...&from=&to= - multiple products (batch). */
 router.get('/prices', async (req: Request, res: Response) => {
@@ -79,27 +127,18 @@ router.get('/prices', async (req: Request, res: Response) => {
     : typeof rawUrls === 'string' && rawUrls.trim()
       ? [rawUrls.trim()]
       : [];
-  const from = typeof req.query.from === 'string' ? req.query.from : null;
-  const to = typeof req.query.to === 'string' ? req.query.to : null;
+  const dates = parseDateRange(req.query.from, req.query.to);
 
   if (productUrls.length === 0) {
     res.status(400).json({ error: 'At least one product_url is required' });
     return;
   }
-  if (!from || !to) {
-    res.status(400).json({ error: 'from and to (YYYY-MM-DD) are required' });
-    return;
-  }
-  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-  if (!dateRe.test(from) || !dateRe.test(to)) {
-    res.status(400).json({ error: 'from and to must be YYYY-MM-DD' });
-    return;
-  }
-  if (from > to) {
-    res.status(400).json({ error: 'from must be <= to' });
+  if ('error' in dates) {
+    res.status(400).json({ error: dates.error });
     return;
   }
   const uniqueUrls = [...new Set(productUrls)].slice(0, 20);
+  const { from, to } = dates;
 
   try {
     const results = await Promise.all(

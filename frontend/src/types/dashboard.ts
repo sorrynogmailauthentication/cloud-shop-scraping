@@ -16,6 +16,16 @@ export interface PricePoint {
   discount_pct: number | null;
 }
 
+/** Closest prices at the table date-range endpoints (not a full history). */
+export interface ProductDatePrices {
+  product_url: string;
+  price_at_start: number | null;
+  price_at_end: number | null;
+  /** From the closest row to the range end; null if that day has no discount. */
+  price_before_discount: number | null;
+  discount_pct: number | null;
+}
+
 /** Whether the list is used on the Table page or Graph page (independent saves per user). */
 export type UserListKind = 'table' | 'graph';
 

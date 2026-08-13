@@ -154,6 +154,95 @@ export async function getShopCategoryPairs(): Promise<ShopCategoryPair[]> {
   return (res.rows as { shop: string; category: string }[]).map((r) => ({ shop: r.shop, category: r.category }));
 }
 
+export interface ProductDatePrices {
+  product_url: string;
+  price_at_start: number | null;
+  price_at_end: number | null;
+  /** From the closest price row to `toDate`, if that row has a discount. */
+  price_before_discount: number | null;
+  discount_pct: number | null;
+}
+
+/**
+ * Closest non-null price to `fromDate` and `toDate` for many URLs, one round-trip.
+ * Neighbors: latest on/before target, else earliest after; tie → earlier date.
+ */
+export async function getClosestPricesForUrls(
+  productUrls: string[],
+  fromDate: string,
+  toDate: string
+): Promise<ProductDatePrices[]> {
+  const uniqueUrls = [...new Set(productUrls.map((u) => u.trim()).filter(Boolean))];
+  if (uniqueUrls.length === 0) return [];
+
+  const neighborLateral = (alias: string, dateParam: string, side: 'lo' | 'hi') =>
+    side === 'lo'
+      ? `LEFT JOIN LATERAL (
+           SELECT pr.date, pr.price,
+                  NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(pr.discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
+           FROM prices pr
+           WHERE p.product_id IS NOT NULL
+             AND pr.product_id = p.product_id
+             AND pr.price IS NOT NULL
+             AND pr.date <= ${dateParam}::date
+           ORDER BY pr.date DESC
+           LIMIT 1
+         ) ${alias} ON true`
+      : `LEFT JOIN LATERAL (
+           SELECT pr.date, pr.price,
+                  NULLIF(REPLACE(TRIM(REGEXP_REPLACE(COALESCE(pr.discount,''), '[^0-9.,]', '', 'g')), ',', '.'), '')::numeric AS price_before_discount
+           FROM prices pr
+           WHERE p.product_id IS NOT NULL
+             AND pr.product_id = p.product_id
+             AND pr.price IS NOT NULL
+             AND pr.date >= ${dateParam}::date
+           ORDER BY pr.date ASC
+           LIMIT 1
+         ) ${alias} ON true`;
+
+  const pickClosestCol = (lo: string, hi: string, dateParam: string, col: string) => `
+    CASE
+      WHEN ${lo}.date IS NULL THEN ${hi}.${col}
+      WHEN ${hi}.date IS NULL THEN ${lo}.${col}
+      WHEN (${dateParam}::date - ${lo}.date) < (${hi}.date - ${dateParam}::date) THEN ${lo}.${col}
+      WHEN (${dateParam}::date - ${lo}.date) > (${hi}.date - ${dateParam}::date) THEN ${hi}.${col}
+      ELSE ${lo}.${col}
+    END`;
+
+  const res = await getPool().query(
+    `SELECT
+       i.url AS product_url,
+       ${pickClosestCol('start_lo', 'start_hi', '$2', 'price')} AS price_at_start,
+       ${pickClosestCol('end_lo', 'end_hi', '$3', 'price')} AS price_at_end,
+       ${pickClosestCol('end_lo', 'end_hi', '$3', 'price_before_discount')} AS price_before_discount
+     FROM unnest($1::text[]) AS i(url)
+     LEFT JOIN LATERAL (
+       SELECT product_id FROM products WHERE url = i.url LIMIT 1
+     ) p ON true
+     ${neighborLateral('start_lo', '$2', 'lo')}
+     ${neighborLateral('start_hi', '$2', 'hi')}
+     ${neighborLateral('end_lo', '$3', 'lo')}
+     ${neighborLateral('end_hi', '$3', 'hi')}`,
+    [uniqueUrls, fromDate, toDate]
+  );
+
+  return (res.rows as Record<string, unknown>[]).map((row) => {
+    const priceAtEnd = priceToNum(row.price_at_end);
+    const beforeDiscount = priceToNum(row.price_before_discount);
+    const discountPct =
+      beforeDiscount != null && beforeDiscount > 0 && priceAtEnd != null && beforeDiscount > priceAtEnd
+        ? Math.round(((beforeDiscount - priceAtEnd) / beforeDiscount) * 10000) / 100
+        : null;
+    return {
+      product_url: String(row.product_url),
+      price_at_start: priceToNum(row.price_at_start),
+      price_at_end: priceAtEnd,
+      price_before_discount: beforeDiscount,
+      discount_pct: discountPct,
+    };
+  });
+}
+
 /** Price history for one product (by canonical URL) in date range. */
 export async function getPriceHistory(
   productUrl: string,

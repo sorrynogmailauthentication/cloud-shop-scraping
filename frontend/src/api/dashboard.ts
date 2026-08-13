@@ -79,6 +79,24 @@ export interface PriceHistoryResult {
   history: import('../types/dashboard').PricePoint[];
 }
 
+export async function fetchPricesAtDates(
+  token: string | null,
+  productUrls: string[],
+  from: string,
+  to: string
+): Promise<{ results: import('../types/dashboard').ProductDatePrices[] }> {
+  const unique = [...new Set(productUrls)];
+  if (unique.length === 0) return { results: [] };
+  const res = await fetch(`${API_BASE}/api/products/prices/at`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    credentials: 'include',
+    body: JSON.stringify({ product_urls: unique, from, to }),
+  });
+  if (!res.ok) throw new Error(await readApiErrorBody(res));
+  return res.json();
+}
+
 export async function fetchPriceHistory(
   token: string | null,
   productUrls: string[],

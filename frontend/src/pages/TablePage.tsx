@@ -2,20 +2,18 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { UserListItem } from '../types/dashboard';
-import { fetchPriceHistoryBatched } from '../api/dashboard';
+import { fetchPricesAtDates } from '../api/dashboard';
 import { DateRangeSlicerPanel } from '../components/DateRangeSlicerPanel';
 import { ProductSearchPanel } from '../components/ProductSearchPanel';
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
 import { useListMainPreservedHeight } from '../hooks/useListMainPreservedHeight';
 import { useUserListEditor } from '../hooks/useUserListEditor';
-import type { PricePoint } from '../types/dashboard';
 import {
   TABLE_DATE_ANCHOR_YMD,
   timelineIdxToYmd,
   timelineYmdToIdx,
   timelineMaxIdx,
   enforceTimelineGap,
-  priceClosestByYmd,
   deltaPctNumeric,
   formatDeltaPctOnly,
   formatDeltaPriceOnly,
@@ -23,6 +21,20 @@ import {
   formatYmdDisplay,
 } from '../utils/priceHistory';
 import { noAutofill } from '../utils/noAutofill';
+
+type TableEndpointPrices = {
+  p0: number | null;
+  p1: number | null;
+  beforeDiscount: number | null;
+  discountPct: number | null;
+};
+
+const EMPTY_ENDPOINT_PRICES: TableEndpointPrices = {
+  p0: null,
+  p1: null,
+  beforeDiscount: null,
+  discountPct: null,
+};
 
 const TABLE_DATE_RANGE_STORAGE_KEY = 'table:date-range:v1';
 const TABLE_DEFAULT_START_YMD = '2026-03-29';
@@ -194,10 +206,10 @@ function TableContent({ token }: { token: string | null }) {
       return fallback;
     }
   });
-  const [histByUrl, setHistByUrl] = useState<Map<string, PricePoint[]>>(() => new Map());
+  const [pricesByUrl, setPricesByUrl] = useState<Map<string, TableEndpointPrices>>(() => new Map());
   const [histLoading, setHistLoading] = useState(false);
   const [histError, setHistError] = useState('');
-  const histCacheRef = useRef<Map<string, PricePoint[]>>(new Map());
+  const histCacheRef = useRef<Map<string, TableEndpointPrices>>(new Map());
   const histWindowKeyRef = useRef<string>('');
   const [tableSort, setTableSort] = useState<TableSortState>({ key: null, dir: null });
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(() => new Set());
@@ -281,7 +293,7 @@ function TableContent({ token }: { token: string | null }) {
     if (!token || !displayItems.length || listLoading) {
       histWindowKeyRef.current = '';
       histCacheRef.current = new Map();
-      setHistByUrl(new Map());
+      setPricesByUrl(new Map());
       setHistLoading(false);
       setHistError('');
       return;
@@ -301,7 +313,7 @@ function TableContent({ token }: { token: string | null }) {
     }
     const missingUrls = urls.filter((u) => !histCacheRef.current.has(u));
     if (missingUrls.length === 0) {
-      if (cacheChanged) setHistByUrl(new Map(histCacheRef.current));
+      if (cacheChanged) setPricesByUrl(new Map(histCacheRef.current));
       setHistLoading(false);
       setHistError('');
       return;
@@ -310,11 +322,21 @@ function TableContent({ token }: { token: string | null }) {
     const timer = window.setTimeout(() => {
       setHistLoading(true);
       setHistError('');
-      fetchPriceHistoryBatched(token, missingUrls, fromYmd, toYmd)
+      fetchPricesAtDates(token, missingUrls, fromYmd, toYmd)
         .then(({ results }) => {
           if (cancelled) return;
-          results.forEach((r) => histCacheRef.current.set(r.product_url, r.history));
-          setHistByUrl(new Map(histCacheRef.current));
+          for (const url of missingUrls) {
+            histCacheRef.current.set(url, EMPTY_ENDPOINT_PRICES);
+          }
+          results.forEach((r) =>
+            histCacheRef.current.set(r.product_url, {
+              p0: r.price_at_start,
+              p1: r.price_at_end,
+              beforeDiscount: r.price_before_discount,
+              discountPct: r.discount_pct,
+            })
+          );
+          setPricesByUrl(new Map(histCacheRef.current));
         })
         .catch((e) => {
           if (!cancelled) {
@@ -346,13 +368,8 @@ function TableContent({ token }: { token: string | null }) {
     const { key, dir } = tableSort;
     if (!key || !dir) return copy;
 
-    const getP0P1 = (item: UserListItem) => {
-      const h = histByUrl.get(item.product_url) ?? [];
-      return {
-        p0: priceClosestByYmd(h, fromYmd),
-        p1: priceClosestByYmd(h, toYmd),
-      };
-    };
+    const getP0P1 = (item: UserListItem) =>
+      pricesByUrl.get(item.product_url) ?? EMPTY_ENDPOINT_PRICES;
 
     copy.sort((a, b) => {
       switch (key) {
@@ -379,13 +396,9 @@ function TableContent({ token }: { token: string | null }) {
         case 'price':
           return cmpNullableNum(getP0P1(a).p1, getP0P1(b).p1, dir);
         case 'beforeDiscount':
-          return cmpNullableNum(
-            a.product?.price_before_discount ?? null,
-            b.product?.price_before_discount ?? null,
-            dir
-          );
+          return cmpNullableNum(getP0P1(a).beforeDiscount, getP0P1(b).beforeDiscount, dir);
         case 'discountPct':
-          return cmpNullableNum(a.product?.discount_pct ?? null, b.product?.discount_pct ?? null, dir);
+          return cmpNullableNum(getP0P1(a).discountPct, getP0P1(b).discountPct, dir);
         case 'atStart': {
           const { p0: a0 } = getP0P1(a);
           const { p0: b0 } = getP0P1(b);
@@ -408,7 +421,7 @@ function TableContent({ token }: { token: string | null }) {
       }
     });
     return copy;
-  }, [displayItems, tableSort, histByUrl, fromYmd, toYmd]);
+  }, [displayItems, tableSort, pricesByUrl]);
 
   useEffect(() => {
     const onUp = () => {
@@ -530,8 +543,8 @@ function TableContent({ token }: { token: string | null }) {
       'Категория',
       `Цена, начало (${fromDateLabel})`,
       `Цена, конец (${toDateLabel})`,
-      'До скидки',
-      'Скидка %',
+      `До скидки (${toDateLabel})`,
+      `Скидка % (${toDateLabel})`,
       'Δ цена',
       'Δ %',
     ];
@@ -542,9 +555,8 @@ function TableContent({ token }: { token: string | null }) {
     ];
 
     for (const item of sortedTableItems) {
-      const h = histByUrl.get(item.product_url) ?? [];
-      const p0 = priceClosestByYmd(h, fromYmd);
-      const p1 = priceClosestByYmd(h, toYmd);
+      const { p0, p1, beforeDiscount, discountPct } =
+        pricesByUrl.get(item.product_url) ?? EMPTY_ENDPOINT_PRICES;
       const row = [
         item.product?.product_name || item.product_url,
         toExternalHref(item.product_url),
@@ -552,8 +564,8 @@ function TableContent({ token }: { token: string | null }) {
         item.product?.category ?? '',
         p0 != null ? formatPriceDisplay(p0) : '',
         p1 != null ? formatPriceDisplay(p1) : '',
-        item.product?.price_before_discount != null ? formatPriceDisplay(item.product.price_before_discount) : '',
-        item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '',
+        beforeDiscount != null ? formatPriceDisplay(beforeDiscount) : '',
+        discountPct != null ? `${discountPct}%` : '',
         formatDeltaPriceOnly(p0, p1) === '—' ? '' : formatDeltaPriceOnly(p0, p1),
         formatDeltaPctOnly(p0, p1) === '—' ? '' : formatDeltaPctOnly(p0, p1),
       ];
@@ -571,7 +583,7 @@ function TableContent({ token }: { token: string | null }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [sortedTableItems, histByUrl, fromYmd, toYmd, fromDateLabel, toDateLabel]);
+  }, [sortedTableItems, pricesByUrl, fromDateLabel, toDateLabel]);
 
   return (
     <div className="table-page-layout">
@@ -769,25 +781,26 @@ function TableContent({ token }: { token: string | null }) {
                     sort={tableSort}
                     onSort={cycleTableSort}
                     className="table-col-num"
+                    title={`Цена до скидки на ${toDateLabel}, если скидка есть`}
                   >
-                    До скидки
+                    <abbr title={`Цена до скидки на ${toDateLabel}, если скидка есть`}>До скидки</abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="discountPct"
                     sort={tableSort}
                     onSort={cycleTableSort}
                     className="table-col-pct"
+                    title={`Скидка на ${toDateLabel}, если есть`}
                   >
-                    Скидка %
+                    <abbr title={`Скидка на ${toDateLabel}, если есть`}>Скидка %</abbr>
                   </SortableTh>
                   <th className="sort-th--narrow" aria-label="Удалить" />
                 </tr>
               </thead>
               <tbody>
                 {sortedTableItems.map((item, index) => {
-                  const h = histByUrl.get(item.product_url) ?? [];
-                  const p0 = priceClosestByYmd(h, fromYmd);
-                  const p1 = priceClosestByYmd(h, toYmd);
+                  const { p0, p1, beforeDiscount, discountPct } =
+                    pricesByUrl.get(item.product_url) ?? EMPTY_ENDPOINT_PRICES;
                   const dn = p0 != null && p1 != null ? p1 - p0 : null;
                   const dPct = deltaPctNumeric(p0, p1);
                   return (
@@ -843,11 +856,15 @@ function TableContent({ token }: { token: string | null }) {
                         {histLoading ? '…' : formatDeltaPctOnly(p0, p1)}
                       </td>
                       <td className="table-col-num">
-                        {item.product?.price_before_discount != null
-                          ? formatPriceDisplay(item.product.price_before_discount)
-                          : '—'}
+                        {histLoading
+                          ? '…'
+                          : beforeDiscount != null
+                            ? formatPriceDisplay(beforeDiscount)
+                            : '—'}
                       </td>
-                      <td className="table-col-pct">{item.product?.discount_pct != null ? `${item.product.discount_pct}%` : '—'}</td>
+                      <td className="table-col-pct">
+                        {histLoading ? '…' : discountPct != null ? `${discountPct}%` : '—'}
+                      </td>
                       <td>
                         <button
                           type="button"

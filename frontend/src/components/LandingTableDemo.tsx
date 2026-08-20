@@ -140,11 +140,14 @@ export default function LandingTableDemo() {
           <thead>
             <tr>
               <th>Товар</th>
-              <th className="landing-table-demo-col-link">Ссылка</th>
               <th className="table-col-shop">Магазин</th>
               <th className="table-col-category">Категория</th>
               <th className="table-col-num">
-                <abbr title="Цена на начало периода">Цена, начало</abbr>
+                <abbr title="Цена на начало периода">
+                  Цена,
+                  <br />
+                  начало
+                </abbr>
               </th>
               <th className="table-col-num">
                 <abbr title="Цена на конец периода">Цена, конец</abbr>
@@ -165,9 +168,6 @@ export default function LandingTableDemo() {
               <tr key={row.product}>
                 <td className="table-col-product" title={row.product}>
                   {row.product}
-                </td>
-                <td className="landing-table-demo-col-link">
-                  <span className="table-link">Ссылка</span>
                 </td>
                 <td className="cell-wrap table-col-shop">{row.shop}</td>
                 <td className="cell-wrap table-col-category">{row.category}</td>

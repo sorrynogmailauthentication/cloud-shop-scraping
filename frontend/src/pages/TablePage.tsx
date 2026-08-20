@@ -44,19 +44,10 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function toExternalHref(rawUrl: string): string {
-  const s = rawUrl.trim();
-  if (!s) return rawUrl;
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith('//')) return `https:${s}`;
-  return `https://${s}`;
-}
-
 type TableSortColumn =
   | 'product'
   | 'shop'
   | 'category'
-  | 'link'
   | 'price'
   | 'beforeDiscount'
   | 'discountPct'
@@ -69,7 +60,6 @@ const TABLE_SORT_COLUMNS: TableSortColumn[] = [
   'product',
   'shop',
   'category',
-  'link',
   'price',
   'beforeDiscount',
   'discountPct',
@@ -391,8 +381,6 @@ function TableContent({ token }: { token: string | null }) {
             (b.product?.category ?? '').toLowerCase(),
             dir
           );
-        case 'link':
-          return cmpStr(a.product_url.toLowerCase(), b.product_url.toLowerCase(), dir);
         case 'price':
           return cmpNullableNum(getP0P1(a).p1, getP0P1(b).p1, dir);
         case 'beforeDiscount':
@@ -538,7 +526,6 @@ function TableContent({ token }: { token: string | null }) {
 
     const headers = [
       'Товар',
-      'Ссылка',
       'Магазин',
       'Категория',
       `Цена, начало (${fromDateLabel})`,
@@ -559,7 +546,6 @@ function TableContent({ token }: { token: string | null }) {
         pricesByUrl.get(item.product_url) ?? EMPTY_ENDPOINT_PRICES;
       const row = [
         item.product?.product_name || item.product_url,
-        toExternalHref(item.product_url),
         item.product?.shop ?? '',
         item.product?.category ?? '',
         p0 != null ? formatPriceDisplay(p0) : '',
@@ -722,9 +708,6 @@ function TableContent({ token }: { token: string | null }) {
                   >
                     Товар
                   </SortableTh>
-                  <SortableTh columnKey="link" sort={tableSort} onSort={cycleTableSort}>
-                    Ссылка
-                  </SortableTh>
                   <SortableTh
                     columnKey="shop"
                     sort={tableSort}
@@ -748,7 +731,11 @@ function TableContent({ token }: { token: string | null }) {
                     className="table-col-num"
                     title={`Ближайшая цена к ${fromDateLabel}`}
                   >
-                    <abbr title={`Ближайшая цена к ${fromDateLabel}`}>Цена, начало</abbr>
+                    <abbr title={`Ближайшая цена к ${fromDateLabel}`}>
+                      Цена,
+                      <br />
+                      начало
+                    </abbr>
                   </SortableTh>
                   <SortableTh
                     columnKey="price"
@@ -815,17 +802,6 @@ function TableContent({ token }: { token: string | null }) {
                         title={item.product?.product_name || item.product_url}
                       >
                         {item.product?.product_name || item.product_url}
-                      </td>
-                      <td>
-                        <a
-                                href={toExternalHref(item.product_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="table-link"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          Ссылка
-                        </a>
                       </td>
                       <td className="cell-wrap table-col-shop">{item.product?.shop ?? '—'}</td>
                       <td className="cell-wrap table-col-category">{item.product?.category ?? '—'}</td>

@@ -687,12 +687,8 @@ html {
 .landing-table-demo-scroll {
   overflow: hidden;
 }
-.landing-table-demo .table-link {
-  cursor: default;
-}
 
 @media (min-width: 641px) and (max-width: 960px) {
-  .landing-table-demo .landing-table-demo-col-link,
   .landing-table-demo .landing-table-demo-col-discount {
     display: none;
   }
@@ -1669,9 +1665,6 @@ html {
 .data-table th.sort-th--narrow .table-sort-btn {
   justify-content: center;
 }
-.data-table .table-link {
-  font-size: 0.85rem;
-}
 .btn-remove {
   padding: 0.2rem 0.4rem;
   font-size: 0.85rem;
@@ -2528,6 +2521,8 @@ html {
 .data-table .table-col-category {
   white-space: normal;
   overflow-wrap: break-word;
+  width: 15rem;
+  max-width: 256px;
 }
 .data-table th.table-col-num,
 .data-table td.table-col-num,
@@ -2544,10 +2539,10 @@ html {
   text-align: right;
 }
 /* Table date price columns: keep compact so they reserve less horizontal space. */
+.table-page .data-table th:nth-child(4),
+.table-page .data-table td:nth-child(4),
 .table-page .data-table th:nth-child(5),
-.table-page .data-table td:nth-child(5),
-.table-page .data-table th:nth-child(6),
-.table-page .data-table td:nth-child(6) {
+.table-page .data-table td:nth-child(5) {
   width: 1%;
   padding-left: 0.4rem;
   padding-right: 0.4rem;

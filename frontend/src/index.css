@@ -1606,6 +1606,9 @@ html {
   border-collapse: collapse;
   font-size: 0.9rem;
 }
+.data-table--resizable {
+  table-layout: fixed;
+}
 .data-table th,
 .data-table td {
   padding: 0.5rem 0.6rem;
@@ -1616,7 +1619,51 @@ html {
   color: var(--muted);
   font-weight: 600;
   font-size: 0.8rem;
-  vertical-align: bottom;
+  vertical-align: middle;
+}
+.data-table .table-col-th {
+  position: relative;
+  cursor: grab;
+  overflow: hidden;
+}
+.data-table .table-col-th.table-col--dragging {
+  cursor: grabbing;
+  opacity: 0.75;
+  background: rgba(240, 180, 41, 0.16);
+}
+.data-table .col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  z-index: 4;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+.data-table .col-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+.data-table .table-col-th:hover .col-resize-handle::after,
+.data-table .col-resize-handle:hover::after,
+body.is-col-resizing .col-resize-handle::after {
+  background: rgba(240, 180, 41, 0.7);
+}
+body.is-col-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.is-col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 .data-table .table-sort-btn {
   display: inline-flex;
@@ -1624,6 +1671,7 @@ html {
   justify-content: flex-start;
   gap: 0.35rem;
   width: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
   font: inherit;
@@ -1633,8 +1681,13 @@ html {
   text-align: left;
   background: none;
   border: none;
-  cursor: pointer;
+  cursor: inherit;
   border-radius: 4px;
+}
+.data-table .table-sort-label {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.25;
 }
 .data-table .table-sort-btn:hover {
   color: var(--text);
@@ -1680,28 +1733,50 @@ html {
   background: rgba(229, 83, 75, 0.15);
 }
 .data-table--selectable tbody tr {
-  cursor: default;
   user-select: none;
 }
-/* Gutter + strip in padding so selection never sits under text (collapse borders break border-left on cells). */
-.data-table--selectable thead th:first-child,
-.data-table--selectable tbody tr td:first-child {
-  position: relative;
-  padding-left: calc(0.6rem + 10px);
+.data-table--selectable tbody tr td {
+  cursor: grab;
+}
+.data-table--selectable tbody tr td.table-col-check,
+.data-table--selectable tbody tr td.table-col-actions {
+  cursor: default;
+}
+.data-table--selectable tbody tr.table-row--dragging {
+  cursor: grabbing;
+  opacity: 0.72;
+  background: rgba(240, 180, 41, 0.16);
+}
+.data-table--selectable tbody tr td.table-col-product,
+.data-table--selectable tbody tr td.table-col-product .table-col-product-text {
+  user-select: text;
+  cursor: text;
+}
+.data-table th.table-col-check,
+.data-table td.table-col-check {
+  text-align: center;
+  vertical-align: middle;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  overflow: visible;
+}
+.data-table thead th.table-col-actions {
+  vertical-align: middle;
+}
+.data-table td.table-col-actions {
+  vertical-align: middle;
+}
+.data-table .table-row-checkbox {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  margin: 0 auto;
+  cursor: pointer;
+  accent-color: var(--accent);
+  vertical-align: middle;
 }
 .data-table--selectable tbody tr.table-row--selected {
   background: rgba(240, 180, 41, 0.1);
-}
-.data-table--selectable tbody tr.table-row--selected td:first-child::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  border-radius: 1px;
-  pointer-events: none;
 }
 .table-select-hint {
   margin: 0 0 0.75rem;
@@ -2335,9 +2410,18 @@ html {
   box-sizing: border-box;
   padding: 1.5rem 1rem;
 }
+.table-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
 .table-toolbar-wrap {
-  width: 100%;
+  flex: 1 1 18rem;
+  width: auto;
   max-width: min(36rem, 94vw);
+  min-width: 0;
 }
 @media (min-width: 720px) {
   .table-toolbar-wrap {
@@ -2350,7 +2434,7 @@ html {
   align-items: flex-start;
   gap: 0.65rem 1rem;
   padding: 0.6rem 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -2453,6 +2537,45 @@ html {
   height: var(--search-control-height);
   cursor: pointer;
 }
+.table-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  margin: 0 0 0 auto;
+  padding-bottom: 0.6rem; /* match .table-toolbar vertical padding so bottoms line up */
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.table-send-to-graph {
+  display: flex;
+  align-items: center;
+}
+.table-send-to-graph-btn {
+  width: auto;
+  min-width: 9.5rem;
+  height: var(--search-control-height);
+  cursor: pointer;
+}
+.table-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.table-selection-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: var(--search-control-height);
+  white-space: nowrap;
+}
+.table-secondary-actions .btn-clear-table,
+.table-secondary-actions .btn-add-all {
+  width: auto;
+  height: var(--search-control-height);
+  cursor: pointer;
+}
 .table-section-header {
   display: flex;
   flex-wrap: wrap;
@@ -2499,6 +2622,9 @@ html {
   z-index: 3;
   background: var(--surface);
 }
+.table-page .table-full-width .data-table thead th.table-col--dragging {
+  z-index: 5;
+}
 .cell-wrap {
   white-space: normal;
   word-wrap: break-word;
@@ -2521,8 +2647,6 @@ html {
 .data-table .table-col-category {
   white-space: normal;
   overflow-wrap: break-word;
-  width: 15rem;
-  max-width: 256px;
 }
 .data-table th.table-col-num,
 .data-table td.table-col-num,
@@ -2538,14 +2662,13 @@ html {
   justify-content: flex-end;
   text-align: right;
 }
-/* Table date price columns: keep compact so they reserve less horizontal space. */
-.table-page .data-table th:nth-child(4),
-.table-page .data-table td:nth-child(4),
-.table-page .data-table th:nth-child(5),
-.table-page .data-table td:nth-child(5) {
-  width: 1%;
-  padding-left: 0.4rem;
-  padding-right: 0.4rem;
+.data-table .table-col-actions {
+  text-align: center;
+  overflow: hidden;
+}
+.data-table--resizable th,
+.data-table--resizable td {
+  overflow: hidden;
 }
 .dashboard.graph-page {
   width: 100%;
